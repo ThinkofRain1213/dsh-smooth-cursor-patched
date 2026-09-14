@@ -3,7 +3,7 @@
  * "animated cursor" plugin (likemuuxi/animated-cursor) that runs in the user's
  * vault. Its CodeMirror hooks have no textarea equivalent, so the RENDER is
  * reproduced 1:1 on an overlay <canvas> while the caret target coordinates
- * come from the textarea's own layout via the mirror-measure technique.
+ * come from the textarea/contenteditable layout via mirror/DOM measurement.
  *
  * Comet mode, exactly as the plugin: the caret is a small rectangle that eases
  * toward the target with a soft lerp; while it travels it leaves a tapered,
@@ -14,7 +14,7 @@
  * (the browser can lay the preview out differently than the mirror).
  *
  * All state is re-read each animation frame — `document.activeElement`, the
- * textarea's selection/scroll, and its bounding rect — so nothing needs
+ * input's selection/scroll, and its bounding rect — so nothing needs
  * per-element attach/dispose and the composer can remount freely. Every owned
  * node and listener is removed on dispose, keeping plugin reloads (HMR) clean.
  */
@@ -23,8 +23,18 @@ import type { CursorSettings, CursorSize } from './cursor-settings.ts'
 const OVERLAY_ID = 'dsh-client-cursor-overlay'
 const STYLE_ID = 'dsh-client-cursor-style'
 
-/** The chat composer textarea, identified by its phase attribute. */
-const COMPOSER_SELECTOR = 'textarea[data-phase]'
+/** The legacy chat composer textarea, identified by its phase attribute. */
+const TEXTAREA_SELECTOR = 'textarea[data-phase]'
+/** The modern composer host (Lexical contenteditable), introduced in DSH 0.1.5. */
+export const COMPOSER_SELECTOR = '[data-composer-input]'
+/**
+ * The ask-question answer field: a native textarea inside the question card
+ * (`dsh-client-ui-user-questions`). Anchored on the host's non-hashed data
+ * attributes so a CSS-module rename cannot silently drop the effect.
+ */
+export const ANSWER_SELECTOR = '[data-question-key] textarea, [data-question-scroll] textarea'
+/** Union matcher used by the capture-phase IME listeners and composer focus check. */
+const COMPOSER_ANY = `${TEXTAREA_SELECTOR}, ${COMPOSER_SELECTOR}, ${ANSWER_SELECTOR}`
 
 /** Comet-mode caret width per size. */
 const COMET_WIDTH: Record<CursorSize, number> = { small: 1.5, medium: 2, large: 2.5 }
@@ -46,8 +56,11 @@ const CARET_CSS = `
   pointer-events: none;
 }
 #${OVERLAY_ID}[data-active='false'] { display: none; }
-/* Hide the composer's native caret while the effect owns it. */
-html.dsh-cursor-active textarea[data-phase] { caret-color: transparent; }
+/* Hide the native caret on every surface the effect owns. */
+html.dsh-cursor-active textarea[data-phase],
+html.dsh-cursor-active [data-composer-input],
+html.dsh-cursor-active [data-question-key] textarea,
+html.dsh-cursor-active [data-question-scroll] textarea { caret-color: transparent; }
 `
 
 /** requestAnimationFrame with a setTimeout fallback (jsdom/tests). */
@@ -62,26 +75,42 @@ const caf = (id: number): void => {
   else window.clearTimeout(id)
 }
 
-/** A caret position in the textarea's content coordinate space. */
+/** A caret position in VIEWPORT coordinate space. */
 interface CursorPoint {
-  /** Horizontal offset (px) from the content origin. */
+  /** Horizontal offset (px) from viewport origin. */
   left: number
-  /** Vertical offset (px) from the content origin. */
+  /** Vertical offset (px) from viewport origin. */
   top: number
   /** Line height in px (the caret's height). */
   height: number
 }
 
 /**
- * Measure the caret position inside a textarea using the mirror technique:
- * a hidden replica of the textarea reflows the text up to `selectionStart`,
- * and a marker span reports where that line lands — covering wrap, line
- * height, padding, and scroll the way `getComputedStyle` alone cannot.
+ * Measure the caret position inside a composer, returning VIEWPORT coordinates.
+ * Two input kinds are supported:
+ *   - legacy `<textarea data-phase>`: mirror the text up to `selectionStart`
+ *     (wrap, line height, padding, scroll) and report where the marker lands;
+ *   - modern `[data-composer-input]` (Lexical contenteditable, DSH 0.1.5+):
+ *     measure from live selection with cascading fallbacks for empty inputs.
  */
-function measureCaret(textarea: HTMLTextAreaElement): CursorPoint | null {
-  const start = textarea.selectionStart
+function measureCaret(input: HTMLElement): CursorPoint | null {
+  if (input instanceof HTMLTextAreaElement) return measureTextareaCaret(input)
+  return measureRichCaret(input)
+}
+
+/** Mirror-measure a native textarea caret; converts to viewport coords. */
+function measureTextareaCaret(textarea: HTMLTextAreaElement): CursorPoint | null {
   const value = textarea.value
-  if (start < 0 || start > value.length) return null
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  if (start < 0 || end < start || end > value.length) return null
+
+  // A native textarea exposes only an ORDERED [start, end] pair — the same
+  // direction-less shape as a DOM Range. The active end of a mouse drag is
+  // `selectionDirection`: measuring `selectionStart` unconditionally pins the caret to
+  // the selection's left edge, so a forward drag never follows the mouse while a
+  // backward drag only appears to work because its focus end happens to be `start`.
+  const caret = start !== end && textarea.selectionDirection === 'forward' ? end : start
 
   const style = window.getComputedStyle(textarea)
   const mirror = document.createElement('div')
@@ -91,15 +120,13 @@ function measureCaret(textarea: HTMLTextAreaElement): CursorPoint | null {
     const value = style[prop]
     if (typeof value === 'string') mirrorStyle[prop] = value
   }
-  // The mirror box must wrap at the textarea's exact content width (boxSizing
-  // is copied — the composer uses border-box), so clientWidth is enough.
   mirror.style.width = `${textarea.clientWidth}px`
   mirror.style.whiteSpace = 'pre-wrap'
   mirror.style.position = 'absolute'
   mirror.style.top = '0'
   mirror.style.visibility = 'hidden'
 
-  const prefix = value.slice(0, start)
+  const prefix = value.slice(0, caret)
   mirror.textContent = prefix.endsWith('\n') ? `${prefix.replace(/\n$/, '')} \n` : prefix
 
   const marker = document.createElement('span')
@@ -114,11 +141,161 @@ function measureCaret(textarea: HTMLTextAreaElement): CursorPoint | null {
   const borderTop = parseFloat(style.borderTopWidth) || 0
   const borderLeft = parseFloat(style.borderLeftWidth) || 0
   const left = (marker.offsetLeft + borderLeft - textarea.scrollLeft) || 0
-  const top = (marker.offsetTop + borderTop - textarea.scrollTop) || 0
-  const height = parseFloat(style.lineHeight) || 20
+  const lineTop = (marker.offsetTop + borderTop - textarea.scrollTop) || 0
+
+  // Glyph-height convention, shared with the contenteditable path: the caret is the
+  // text's glyph box (≈1.35 × font-size), vertically centred in the line box by the
+  // half-leading. Reporting the raw line-height here would draw a visibly taller caret
+  // than the chat composer's for the very same 14px/24px typography.
+  const lineHeight = parseFloat(style.lineHeight) || 20
+  const fontSize = parseFloat(style.fontSize) || 14
+  const height = Math.min(lineHeight, Math.round(fontSize * 1.35) || 19)
+  const halfLeading = Math.max(0, Math.floor((lineHeight - height) / 2))
 
   mirror.remove()
-  return { left, top, height }
+
+  const rect = textarea.getBoundingClientRect()
+  return { left: left + rect.left, top: lineTop + rect.top + halfLeading, height }
+}
+
+/** Determine whether a selection is oriented forward (anchor before focus in document order). */
+function isSelectionForward(selection: Selection): boolean {
+  if (selection.isCollapsed) return true
+  const anchor = selection.anchorNode
+  const focus = selection.focusNode
+  if (anchor === null || focus === null) return true
+  if (anchor === focus) {
+    return selection.anchorOffset <= selection.focusOffset
+  }
+  const pos = anchor.compareDocumentPosition(focus)
+  return (pos & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+}
+
+/**
+ * Measure a modern contenteditable composer caret from the live selection range
+ * with robust multi-tiered fallbacks. Keeps initial caret height identical to typed text.
+ */
+function measureRichCaret(host: HTMLElement): CursorPoint | null {
+  const selection = window.getSelection()
+  if (selection === null || selection.rangeCount === 0) return null
+  const range = selection.getRangeAt(0)
+  if (range === null || !host.contains(range.startContainer)) return null
+
+  const hostStyle = window.getComputedStyle(host)
+  const defaultLineHeight = parseFloat(hostStyle.lineHeight) || 24
+  const fontSize = parseFloat(hostStyle.fontSize) || 14
+  const expectedCaretHeight = Math.min(defaultLineHeight, Math.round(fontSize * 1.35) || 19)
+  const halfLeading = Math.max(0, Math.floor((defaultLineHeight - expectedCaretHeight) / 2))
+
+  const hostRect = host.getBoundingClientRect()
+  const borderTop = parseFloat(hostStyle.borderTopWidth) || 0
+  const borderLeft = parseFloat(hostStyle.borderLeftWidth) || 0
+  const paddingTop = parseFloat(hostStyle.paddingTop) || 0
+  const paddingLeft = parseFloat(hostStyle.paddingLeft) || 0
+  const lineStartLeft = hostRect.left + borderLeft + paddingLeft - host.scrollLeft
+
+  // Tier 1: Direction-aware selection measurement (tracks active mouse head)
+  const rects = range.getClientRects()
+  if (rects.length > 0) {
+    const isForward = isSelectionForward(selection)
+    const r = isForward ? rects[rects.length - 1] : rects[0]
+    if (r !== undefined && (r.width > 0 || r.height > 0 || r.top > 0 || r.left > 0)) {
+      return {
+        left: (isForward && !selection.isCollapsed) ? r.right : r.left,
+        top: r.top,
+        height: r.height || expectedCaretHeight,
+      }
+    }
+  }
+
+  // Tier 1.5: Preempt empty lines (soft line breaks or empty paragraph blocks) before Tier 2.
+  // Prevents Chromium from erroneously snapping collapsed empty-line ranges back to previous text.
+  if (selection.isCollapsed) {
+    const focusNode = selection.focusNode
+    const offset = selection.focusOffset
+
+    if (focusNode instanceof Element && host.contains(focusNode)) {
+      // Case A: Soft line-break inside a paragraph (e.g. <span>text</span><br>|)
+      const prevChild = offset > 0 ? focusNode.childNodes[offset - 1] : null
+      if (prevChild instanceof Element && prevChild.tagName === 'BR') {
+        const brRect = prevChild.getBoundingClientRect()
+        const prevTop = brRect.top > 0 ? brRect.top : (hostRect.top + paddingTop + halfLeading)
+        return {
+          left: lineStartLeft,
+          top: prevTop + defaultLineHeight,
+          height: expectedCaretHeight,
+        }
+      }
+
+      // Case B: Entirely empty paragraph block (e.g. <p dir="ltr"><br></p> between paragraphs)
+      if (focusNode !== host && (focusNode.textContent ?? '').trim() === '') {
+        const pRect = focusNode.getBoundingClientRect()
+        if (pRect.top > 0 && pRect.height > 0) {
+          return {
+            left: lineStartLeft,
+            top: pRect.top + halfLeading,
+            height: expectedCaretHeight,
+          }
+        }
+      }
+    }
+  }
+
+  // Tier 2: Try range.getBoundingClientRect() if it returned positive coordinates
+  const rangeRect = range.getBoundingClientRect()
+  if (rangeRect.top > 0 || rangeRect.left > 0) {
+    const isForward = isSelectionForward(selection)
+    return {
+      left: (isForward && !selection.isCollapsed) ? rangeRect.right : rangeRect.left,
+      top: rangeRect.top,
+      height: rangeRect.height || expectedCaretHeight,
+    }
+  }
+
+  // Tier 3: Probe DOM container elements inside host (Lexical <p> or <br>)
+  const startEl = range.startContainer instanceof Element
+    ? range.startContainer
+    : range.startContainer.parentElement
+
+  const searchRoot = (startEl instanceof HTMLElement && host.contains(startEl) && startEl !== host) ? startEl : host
+  const br = searchRoot.querySelector('br')
+  if (br !== null) {
+    const brRect = br.getBoundingClientRect()
+    if (brRect.top > 0 && brRect.bottom >= brRect.top) {
+      return {
+        left: brRect.left,
+        top: brRect.top,
+        height: (brRect.height > 0 ? brRect.height : expectedCaretHeight),
+      }
+    }
+  }
+
+  if (startEl instanceof HTMLElement && startEl !== host && host.contains(startEl)) {
+    const pRect = startEl.getBoundingClientRect()
+    if (pRect.top > 0 && pRect.height > 0) {
+      const pStyle = window.getComputedStyle(startEl)
+      const pPadLeft = parseFloat(pStyle.paddingLeft) || 0
+      return {
+        left: pRect.left + pPadLeft,
+        top: pRect.top + halfLeading,
+        height: expectedCaretHeight,
+      }
+    }
+  }
+
+  // Tier 4: Fallback for completely empty composer input based on host padding/border
+  return {
+    left: lineStartLeft,
+    top: hostRect.top + borderTop + paddingTop + halfLeading - host.scrollTop,
+    height: expectedCaretHeight,
+  }
+}
+
+/** Get the visible scrollport bounding rect for clipping the caret overlay. */
+function getComposerClipRect(composer: HTMLElement): DOMRect {
+  const scrollContainer = composer.closest('[data-input-scroll]') as HTMLElement | null
+  const clipHost = scrollContainer ?? composer
+  return clipHost.getBoundingClientRect()
 }
 
 /** Textarea presentation props the mirror must reproduce for a faithful reflow. */
@@ -158,22 +335,30 @@ export class CursorEngine {
   // Comet trail (plugin state).
   private trailPts: { x: number; y: number }[] = []
 
+  // Blink timing: standard 500ms half-cycle (VS Code / Web standard cadence).
+  private lastActivityTime = performance.now()
+  private readonly BLINK_HALF_CYCLE = 500
+
   private composing = false
   private lastSignature = ''
   private caret: CursorPoint | null = null
+  /** The input surface the caret is currently seated on (chat composer vs question card). */
+  private activeComposer: HTMLElement | null = null
 
   private readonly onCompositionStart = (event: Event): void => {
     const target = event.target
-    if (!(target instanceof HTMLTextAreaElement) || !target.matches(COMPOSER_SELECTOR)) return
+    if (!(target instanceof HTMLElement) || !target.matches(COMPOSER_ANY)) return
     this.composing = true
     this.lastSignature = ''
+    this.lastActivityTime = performance.now()
   }
 
   private readonly onCompositionEnd = (event: Event): void => {
     const target = event.target
-    if (!(target instanceof HTMLTextAreaElement) || !target.matches(COMPOSER_SELECTOR)) return
+    if (!(target instanceof HTMLElement) || !target.matches(COMPOSER_ANY)) return
     this.composing = false
     this.lastSignature = ''
+    this.lastActivityTime = performance.now()
   }
 
   /** @param settings - initial effect preference (first apply re-applies). */
@@ -256,38 +441,55 @@ export class CursorEngine {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.clearRect(0, 0, width, height)
 
-    const textarea = this.focusedComposer()
-    if (textarea === null) {
+    const composer = this.focusedComposer()
+    if (composer === null) {
       // The composer lost focus (e.g. Settings opened): draw nothing and drop
       // the stale caret/trail, so the effect never floats over other chrome.
       this.clear()
       this.trailPts = []
       this.initialized = false
       this.lastSignature = ''
+      this.activeComposer = null
       return
     }
 
-    // Re-measure every frame while composing; otherwise on signature change.
-    if (this.composing || this.signature(textarea) !== this.lastSignature) {
-      this.lastSignature = this.composing ? '' : this.signature(textarea)
-      this.caret = measureCaret(textarea)
+    // Re-seat instantly when the focused input surface changes (chat composer ↔
+    // question card): a cross-screen glide would drag a comet trail over chrome.
+    if (this.activeComposer !== composer) {
+      this.activeComposer = composer
+      this.initialized = false
+      this.lastSignature = ''
+      this.trailPts = []
+      this.lastActivityTime = performance.now()
+    }
+
+    // Re-measure every frame while composing (and for the contenteditable
+    // composer, whose selection has no cheap signature); otherwise on
+    // signature change.
+    const sig = this.signature(composer)
+    if (this.composing || sig === null || sig !== this.lastSignature) {
+      this.lastSignature = sig === null ? '' : sig
+      this.caret = measureCaret(composer)
     }
     if (this.caret === null) {
       this.clear()
       return
     }
-    const rect = textarea.getBoundingClientRect()
-    this.targetX = rect.left + this.caret.left
-    this.targetY = rect.top + this.caret.top
+    // measureCaret returns viewport coordinates; the overlay is a fixed
+    // full-viewport canvas, so no further offset math is needed.
+    this.targetX = this.caret.left
+    this.targetY = this.caret.top
     this.currentHeight = this.caret.height
 
     if (!this.initialized) {
       this.currentX = this.targetX
       this.currentY = this.targetY
       this.initialized = true
+      this.lastActivityTime = performance.now()
     }
 
-    this.renderComet(ctx)
+    const clipRect = getComposerClipRect(composer)
+    this.renderComet(ctx, clipRect)
   }
 
   /** Resize the backing canvas to the viewport × devicePixelRatio. */
@@ -309,8 +511,8 @@ export class CursorEngine {
     if (this.overlay.style.height !== `${cssHeight}px`) this.overlay.style.height = `${cssHeight}px`
   }
 
-  /** Comet mode: lerp 0.2, tapered stroke trail, rectangle head (plugin `S`). */
-  private renderComet(ctx: CanvasRenderingContext2D): void {
+  /** Comet mode with scrollport clipping and out-of-bounds culling. */
+  private renderComet(ctx: CanvasRenderingContext2D, clipRect: DOMRect): void {
     const target = this.targetX
     if (Math.abs(this.targetX - this.currentX) < SNAP_EPSILON) this.currentX = this.targetX
     else this.currentX += (target - this.currentX) * COMET_SMOOTHNESS
@@ -318,14 +520,41 @@ export class CursorEngine {
     else this.currentY += (this.targetY - this.currentY) * COMET_SMOOTHNESS
 
     const moving = Math.hypot(this.targetX - this.currentX, this.targetY - this.currentY) > COMET_MOVE_THRESHOLD
-    if (moving && this.settings.trail) {
-      this.trailPts.push({ x: this.currentX, y: this.currentY })
-      if (this.trailPts.length > COMET_TRAIL[this.settings.size]) this.trailPts.shift()
-      this.drawCometTrail(ctx)
+    if (moving) {
+      this.lastActivityTime = performance.now()
+      if (this.settings.trail) {
+        this.trailPts.push({ x: this.currentX, y: this.currentY })
+        if (this.trailPts.length > COMET_TRAIL[this.settings.size]) this.trailPts.shift()
+      } else {
+        this.trailPts = []
+      }
     } else {
       this.trailPts = []
     }
+
+    // Out-of-bounds culling: if caret is completely outside the scroll viewport, drop trail and skip draw
+    const caretBottom = this.currentY + (this.currentHeight || 20)
+    if (caretBottom <= clipRect.top || this.currentY >= clipRect.bottom) {
+      this.trailPts = []
+      return
+    }
+
+    // Viewport-clamped draw. Clip VERTICALLY only: the scrollport's real job is hiding
+    // caret lines that scrolled out of view, and the composer always wraps so nothing
+    // ever overflows horizontally. A full-box rect shaves the caret's own half-width in
+    // half whenever it sits on the content origin (a padding-0 field puts it exactly on
+    // the box's left edge), which makes a 2px comet read as a 1px native caret.
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, clipRect.top, window.innerWidth, clipRect.height)
+    ctx.clip()
+
+    if (this.settings.trail && this.trailPts.length > 0) {
+      this.drawCometTrail(ctx)
+    }
     this.drawCometHead(ctx, moving)
+
+    ctx.restore()
   }
 
   private drawCometTrail(ctx: CanvasRenderingContext2D): void {
@@ -351,6 +580,15 @@ export class CursorEngine {
   }
 
   private drawCometHead(ctx: CanvasRenderingContext2D, moving: boolean): void {
+    // Caret blinking: stays solid while moving or typing, blinks on a crisp 500ms cadence when idle
+    if (this.settings.blink && !moving) {
+      const elapsed = performance.now() - this.lastActivityTime
+      const phase = elapsed % (this.BLINK_HALF_CYCLE * 2)
+      if (phase >= this.BLINK_HALF_CYCLE) {
+        return // Dark phase (500ms ~ 1000ms): skip drawing head
+      }
+    }
+
     const color = this.settings.color
     const width = COMET_WIDTH[this.settings.size]
     const n = Math.max(8, this.currentHeight || 24)
@@ -374,16 +612,24 @@ export class CursorEngine {
     this.ctx.clearRect(0, 0, this.overlay.width, this.overlay.height)
   }
 
-  /** The composer textarea when it has focus, else null. */
-  private focusedComposer(): HTMLTextAreaElement | null {
+  /** The composer input when it has focus (textarea or contenteditable), else null. */
+  private focusedComposer(): HTMLElement | null {
     const active = document.activeElement
-    if (!(active instanceof HTMLTextAreaElement)) return null
-    if (!active.matches(COMPOSER_SELECTOR)) return null
+    if (!(active instanceof HTMLElement)) return null
+    if (!active.matches(COMPOSER_ANY)) return null
     return active
   }
 
-  /** Track the pieces that change where the caret line lands. */
-  private signature(textarea: HTMLTextAreaElement): string {
-    return `${textarea.selectionStart}|${textarea.value.length}|${textarea.scrollTop}|${textarea.scrollLeft}|${textarea.clientWidth}`
+  /**
+   * Track the pieces that change where the caret line lands. The modern
+   * contenteditable composer has no selectionStart/value/scroll mirrors, so
+   * it reports null (re-measure every frame).
+   */
+  private signature(input: HTMLElement): string | null {
+    if (!(input instanceof HTMLTextAreaElement)) return null
+    // `selectionEnd` / `selectionDirection` must ride the signature: during a FORWARD
+    // drag `selectionStart` stays pinned to the anchor, so keying on it alone never
+    // invalidates the signature and the caret is never re-measured.
+    return `${input.selectionStart}|${input.selectionEnd}|${input.selectionDirection}|${input.value.length}|${input.scrollTop}|${input.scrollLeft}|${input.clientWidth}`
   }
 }

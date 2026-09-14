@@ -19,6 +19,8 @@ export interface CursorSettings {
   enabled: boolean
   /** Comet trail: on = a fading tail; off = bare caret. */
   trail: boolean
+  /** Blinking caret: on = blinks when idle, steady while typing; off = always solid. */
+  blink: boolean
   /** Accent color (hex) of the caret and its trail. */
   color: string
   /** Caret thickness. */
@@ -40,10 +42,11 @@ export const CURSOR_COLOR_SWATCHES: readonly string[] = Object.freeze([
   '#F8FAFC', // near-white
 ])
 
-/** The effect defaults: on, trail on, brand-blue, medium. */
+/** The effect defaults: on, trail on, blink on, brand-blue, medium. */
 export const DEFAULT_CURSOR_SETTINGS: CursorSettings = Object.freeze({
   enabled: true,
   trail: true,
+  blink: true,
   color: DEFAULT_CURSOR_COLOR,
   size: 'medium',
 })
@@ -66,6 +69,7 @@ function normalize(input: Partial<CursorSettings> | null | undefined): CursorSet
   return {
     enabled: typeof source.enabled === 'boolean' ? source.enabled : DEFAULT_CURSOR_SETTINGS.enabled,
     trail: typeof source.trail === 'boolean' ? source.trail : DEFAULT_CURSOR_SETTINGS.trail,
+    blink: typeof source.blink === 'boolean' ? source.blink : DEFAULT_CURSOR_SETTINGS.blink,
     color: isColor(source.color) ? source.color : DEFAULT_CURSOR_SETTINGS.color,
     size: isCursorSize(source.size) ? source.size : DEFAULT_CURSOR_SETTINGS.size,
   }

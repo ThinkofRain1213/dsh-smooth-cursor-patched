@@ -18,6 +18,8 @@ export interface CursorRowInjected {
   setEnabled: (enabled: boolean) => void
   /** Toggle the comet trail. */
   setTrail: (trail: boolean) => void
+  /** Toggle caret blinking while idle. */
+  setBlink: (blink: boolean) => void
   /** Set the accent color. */
   setColor: (color: string) => void
   /** Set the caret thickness. */
@@ -54,7 +56,7 @@ function Switch({ checked, onChange, label }: SwitchProps) {
 }
 
 /** Render the Input caret preference row. */
-export function CursorRow({ t, useCursor, setEnabled, setTrail, setColor, setSize }: CursorRowProps) {
+export function CursorRow({ t, useCursor, setEnabled, setTrail, setBlink, setColor, setSize }: CursorRowProps) {
   const settings = useCursor(state => state.settings)
   return (
     <div className={css.group}>
@@ -73,6 +75,16 @@ export function CursorRow({ t, useCursor, setEnabled, setTrail, setColor, setSiz
         </span>
         <span className={css.itemControl}>
           <Switch checked={settings.trail} onChange={setTrail} label={t('cursor.trail')} />
+        </span>
+      </div>
+
+      <div className={css.item}>
+        <span className={css.itemText}>
+          <span className={css.itemTitle}>{t('cursor.blink')}</span>
+          <span className={css.itemDesc}>{t('cursor.blinkDescription')}</span>
+        </span>
+        <span className={css.itemControl}>
+          <Switch checked={settings.blink} onChange={setBlink} label={t('cursor.blink')} />
         </span>
       </div>
 

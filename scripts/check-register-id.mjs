@@ -40,7 +40,7 @@ function patchNames(text) {
   if (!insertMatch) return names
   const rest = text.slice(insertMatch.index)
   for (const { 1: name } of rest.matchAll(/name:\s*['"]?([^'"\n]+)['"]?/g)) {
-    names.push(name)
+    names.push(name.trim())
   }
   return names
 }

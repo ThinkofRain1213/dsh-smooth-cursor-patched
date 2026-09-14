@@ -20,6 +20,7 @@ export interface CursorRowState {
 function sameSettings(left: CursorSettings, right: CursorSettings): boolean {
   return left.enabled === right.enabled
     && left.trail === right.trail
+    && left.blink === right.blink
     && left.color === right.color
     && left.size === right.size
 }
@@ -54,6 +55,11 @@ export class CursorController {
   /** Toggle the typing trail. */
   setTrail(trail: boolean): void {
     this.update({ ...this.settings, trail })
+  }
+
+  /** Toggle caret blinking while idle. */
+  setBlink(blink: boolean): void {
+    this.update({ ...this.settings, blink })
   }
 
   /** Set the accent color (validated hex). */
