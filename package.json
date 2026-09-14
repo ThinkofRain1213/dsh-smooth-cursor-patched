@@ -1,16 +1,16 @@
 {
-  "name": "dsh-smooth-cursor",
-  "description": "Smooth comet-mode animated caret for the DSH chat composer — a standalone installable DSH plugin (ported from the Obsidian Animated Cursor plugin)",
-  "version": "0.1.7",
+  "name": "dsh-smooth-cursor-patched",
+  "description": "Smooth comet-mode animated caret for the DSH chat composer and question cards — enhanced community patched edition",
+  "version": "0.1.9-patched.1",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Lacquervii/smooth-cursor.git"
+    "url": "git+https://github.com/ThinkofRain1213/smooth-cursor.git"
   },
-  "homepage": "https://github.com/Lacquervii/smooth-cursor#readme",
+  "homepage": "https://github.com/ThinkofRain1213/smooth-cursor#readme",
   "bugs": {
-    "url": "https://github.com/Lacquervii/smooth-cursor/issues"
+    "url": "https://github.com/ThinkofRain1213/smooth-cursor/issues"
   },
   "main": "lib/index.js",
   "exports": {

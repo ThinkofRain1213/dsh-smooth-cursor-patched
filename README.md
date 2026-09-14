@@ -1,43 +1,41 @@
-# dsh-smooth-cursor
+# dsh-smooth-cursor-patched
 
 **中文 | [English](README.en.md)**
 
-一个为 [DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）Web 聊天输入框打造的**彗星光标**插件——把原生闪烁光标替换成一枚会随输入平滑滑动的发光彗星，支持自定义拖尾、强调色和粗细。这是一个独立、可安装的 DSH 插件。
+一个为 [DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）打造的**平滑彗星光标（社区深度修复与增强版）**——把原生输入光标替换成一枚会随输入平滑滑动的发光彗星，支持自定义拖尾、强调色、粗细及 500ms 黄金呼吸节拍。
+
+> 本项目为 `dsh-smooth-cursor` 的本地增强修复版（Patched Edition），彻底根治了原版在空内容、软换行、划词方向、超长滚动及询问界面中的多项体验缺陷。
 
 ![category](https://img.shields.io/badge/category-UI_Enhancement-orange)
-[![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-<p align="center">
-  <img src="docs/social-preview.png" alt="dsh-smooth-cursor preview" width="800">
-</p>
+---
 
-## 预览
+## 核心特性与修复
 
-<video src="docs/preview.mp4" controls width="720" muted></video>
+- **平滑彗星光标** — 平滑缓动，移动时光标优雅滑向目标字符位置。
+- **彗星拖尾** — 移动光标时带有渐细渐隐的粒子拖尾。
+- **光标闪烁呼吸（新增）** — 恢复并对齐 VS Code / 原生 500ms 黄金呼吸节拍，无操作 0.5 秒准时呼吸，打字时 100% 常亮，支持独立开关。
+- **空内容与初次聚焦保活（修复）** — 彻底解决原版空输入框或初次点击时光标彻底消失的 Bug。
+- **双向划词跟手（修复）** — 具备方向感知能力，无论正向拖选（从左往右）还是逆向拖选（从右往左），光标始终紧随鼠标指针。
+- **换行空行精准拦截（修复）** — 根治 `Shift + Enter` 换行到空行时光标停留在上一行末尾、打字才瞬移的 Chromium 回溯吸附缺陷。
+- **视口物理纵向裁剪（修复）** — 长文本输入滚动时，超界光标自动剔除与平滑裁切，绝不越界漂浮到聊天区或工具栏。
+- **覆盖询问界面（新增）** — 全面支持 `ask_user_question` 交互卡片的作答输入框。
+- **浏览器本地持久化** — 设置保存于 `localStorage`，即开即用。
 
-## 特性
+---
 
-- **呼吸光标** — 平滑缓动，输入时滑向文字位置，而非闪烁。
-- **彗星拖尾** — 移动光标时带有渐细渐隐的拖尾。
-- **可配置** — 开关特效、开关拖尾、强调色（预设色板或自定义取色）、粗细（细 / 中 / 粗）。
-- **适配 IME** — 测量尊重输入法组合状态，中文、日文输入依然准确。
-- **浏览器本地持久化** — 设置存于 `localStorage`，无需重启宿主或来回请求。
-
-## 安装
+## 安装与使用
 
 ### 作为 DSH 插件安装（推荐）
 
-```bash
-dsh plugin --profile web add dsh-smooth-cursor
-```
-
-或通过 GitHub：
+通过 GitHub 一键安装：
 
 ```bash
-dsh plugin --profile web add github:Lacquervii/smooth-cursor
+dsh plugin --profile web add github:ThinkofRain1213/smooth-cursor
 ```
 
-然后重启 `dsh web`，在 **设置 → 通用 → 输入光标** 中找到设置项。
+安装后刷新或重启 `dsh web`，在 **设置 → 通用 → 输入光标** 中即可开启或微调各项参数。
 
 ### 手动安装（本地开发）
 

@@ -1,5 +1,5 @@
-# dsh-smooth-cursor — DSH installable bundle patch
-# Registers the plugin row into the web profile's client roster.
+# dsh-smooth-cursor-patched — DSH installable bundle patch
+# Registers the patched plugin row into the web profile's client roster.
 - insert:
-    - id: smooth-cursor
-      name: dsh-smooth-cursor
+    - id: smooth-cursor-patched
+      name: dsh-smooth-cursor-patched
