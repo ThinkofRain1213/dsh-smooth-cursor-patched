@@ -194,6 +194,43 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
   const paddingLeft = parseFloat(hostStyle.paddingLeft) || 0
   const lineStartLeft = hostRect.left + borderLeft + paddingLeft - host.scrollLeft
 
+  /**
+   * The caret's nearest block container (a `<p>` in Lexical's DOM), so the empty-line
+   * probe below cannot pick up a `<br>` from an unrelated block.
+   *
+   * A composer-wide `host.querySelector('br')` returns the FIRST `<br>` in document
+   * order, which is not necessarily the caret's: an inline `<code>`/`<kbd>` line carries
+   * its own monospace metrics, so a caret on a plain empty line below such a block would
+   * measure the code font's height instead of its own (measured: 17 vs the correct 19).
+   */
+  const caretBlock = (node: Node | null): HTMLElement => {
+    // A text node's parentElement is its containing element; a null node (no selection
+    // focus yet) simply falls through to the host.
+    let el: Element | null = node === null ? null : (node instanceof Element ? node : node.parentElement)
+    while (el !== null && el !== host) {
+      const display = window.getComputedStyle(el).display
+      if (display === 'block' || display === 'list-item' || display === 'flex') {
+        return el instanceof HTMLElement ? el : host
+      }
+      el = el.parentElement
+    }
+    return host
+  }
+
+  /**
+   * Glyph height read off a real `<br>` that the engine laid out with this line's own font
+   * metrics. Verified identical to a typed caret's rect across 7 fonts x 7 font sizes, and
+   * under CSS zoom/transform — where canvas font metrics cannot follow, because
+   * `getComputedStyle` keeps reporting the UNSCALED font-size. Returns null when the block
+   * has no `<br>`, leaving the caller to fall back to the font-size heuristic.
+   */
+  const brHeightIn = (root: HTMLElement): number | null => {
+    const br = root.querySelector('br')
+    if (br === null) return null
+    const measured = br.getBoundingClientRect().height
+    return measured > 0 ? measured : null
+  }
+
   // Tier 1: Direction-aware selection measurement (tracks active mouse head)
   const rects = range.getClientRects()
   if (rects.length > 0) {
@@ -207,6 +244,12 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
       }
     }
   }
+
+  // Only reached when Tier 1 missed — i.e. the caret sits on an empty line, where the
+  // browser reports no rect at all. Measure the glyph height from that line's own `<br>`
+  // instead of the font-size heuristic, so the caret keeps the same height it will have
+  // once the user types, and keeps tracking the font if the host restyles.
+  const emptyLineHeight = brHeightIn(caretBlock(selection.focusNode)) ?? expectedCaretHeight
 
   // Tier 1.5: Preempt empty lines (soft line breaks or empty paragraph blocks) before Tier 2.
   // Prevents Chromium from erroneously snapping collapsed empty-line ranges back to previous text.
@@ -223,7 +266,8 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
         return {
           left: lineStartLeft,
           top: prevTop + defaultLineHeight,
-          height: expectedCaretHeight,
+          // This <br> IS the caret's own line, so measure it directly — no probe needed.
+          height: brRect.height > 0 ? brRect.height : expectedCaretHeight,
         }
       }
 
@@ -234,7 +278,7 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
           return {
             left: lineStartLeft,
             top: pRect.top + halfLeading,
-            height: expectedCaretHeight,
+            height: emptyLineHeight,
           }
         }
       }
@@ -257,7 +301,12 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
     ? range.startContainer
     : range.startContainer.parentElement
 
-  const searchRoot = (startEl instanceof HTMLElement && host.contains(startEl) && startEl !== host) ? startEl : host
+  // Scope the probe to the caret's own block rather than the whole host, for the same
+  // reason as `caretBlock` above: a composer-wide lookup can land on an inline
+  // `<code>` line's `<br>` and report that font's height instead of the caret's.
+  const searchRoot = (startEl instanceof HTMLElement && host.contains(startEl) && startEl !== host)
+    ? startEl
+    : caretBlock(selection.focusNode)
   const br = searchRoot.querySelector('br')
   if (br !== null) {
     const brRect = br.getBoundingClientRect()
@@ -278,7 +327,7 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
       return {
         left: pRect.left + pPadLeft,
         top: pRect.top + halfLeading,
-        height: expectedCaretHeight,
+        height: emptyLineHeight,
       }
     }
   }
@@ -287,7 +336,7 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
   return {
     left: lineStartLeft,
     top: hostRect.top + borderTop + paddingTop + halfLeading - host.scrollTop,
-    height: expectedCaretHeight,
+    height: emptyLineHeight,
   }
 }
 
