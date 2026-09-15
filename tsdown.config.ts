@@ -84,7 +84,15 @@ const client = {
         minify: true,
       })
       const classMap: Record<string, string> = {}
-      for (const [local, exp] of Object.entries(cssExports ?? {})) classMap[local] = exp.name
+      // Sort before emitting. lightningcss does not guarantee the key order of
+      // `exports`, so iterating it directly made this bundle nondeterministic:
+      // two builds of identical sources produced different bytes (and therefore
+      // different SHA-256), which showed up as spurious diffs on every rebuild
+      // and made "is lib/ in sync with src/?" unanswerable by hash. The map is
+      // keyed by class name, so ordering carries no meaning and sorting is free.
+      for (const local of Object.keys(cssExports ?? {}).sort()) {
+        classMap[local] = (cssExports ?? {})[local].name
+      }
       return [
         `const css = ${JSON.stringify(code.toString())};`,
         `const tagId = ${JSON.stringify(`${PACKAGE_NAME}/${basename(fileId)}`)};`,
