@@ -1,16 +1,16 @@
 {
   "name": "dsh-smooth-cursor-patched",
   "description": "Smooth comet-mode animated caret for the DSH chat composer and question cards — enhanced community patched edition",
-  "version": "0.1.9-patched.1",
+  "version": "0.1.9-patched.2",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ThinkofRain1213/smooth-cursor.git"
+    "url": "git+https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched.git"
   },
-  "homepage": "https://github.com/ThinkofRain1213/smooth-cursor#readme",
+  "homepage": "https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched#readme",
   "bugs": {
-    "url": "https://github.com/ThinkofRain1213/smooth-cursor/issues"
+    "url": "https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/issues"
   },
   "main": "lib/index.js",
   "exports": {

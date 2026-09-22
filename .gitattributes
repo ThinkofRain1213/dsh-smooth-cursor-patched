@@ -1,0 +1,11 @@
+# Build output under lib/ is compared byte-for-byte against the sources it was
+# generated from, so it must not be rewritten by end-of-line conversion.
+# Without this, core.autocrlf=true makes git report lib/client.js as modified
+# on a clean checkout (identical content and size, differing only in the EOL it
+# would apply on the next checkout), which breaks any "is the committed bundle
+# still in sync with src/?" check.
+#
+# The bundle is emitted with LF on every platform, so declare it as LF rather
+# than "text" (which would normalise to the platform default on checkout).
+lib/*.js text eol=lf
+lib/*.js.map text eol=lf

@@ -1,0 +1,101 @@
+name: Publish npm
+
+# Publishes through npm Trusted Publishing (OIDC): no long-lived token is
+# stored in this repository. The npm side must be configured once for the
+# package before this workflow can publish —
+#   npm trust github dsh-smooth-cursor-patched --file publish.yml \
+#     --repo ThinkofRain1213/dsh-smooth-cursor-patched --allow-publish
+# npm has no "pending publisher" concept, so the very first release has to be
+# published by hand; everything after that can go through here.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing non-draft GitHub Release tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish trusted npm release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then TAG="$INPUT_TAG"; else TAG="$RELEASE_TAG"; fi
+          test -n "$TAG"
+          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+          test "$(jq -r .draft <<<"$RELEASE_JSON")" = "false"
+          test "$(jq -r .tag_name <<<"$RELEASE_JSON")" = "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Install npm with trusted-publishing support
+        run: npm install --global npm@11.5.1
+      - name: Verify tag matches package version
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # The version line is a prerelease (0.1.9-patched.N), so the tag is
+          # literally "v" + that string; there is no separate prerelease form.
+          VERSION="$(node -p "require('./package.json').version")"
+          test "$TAG" = "v$VERSION"
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Type-check the sources
+        run: pnpm run typecheck
+      - name: Build the node and client bundles
+        run: pnpm run build
+      - name: Assert the bundle's registration id matches the patch name
+        run: pnpm run check:register-id
+      - name: Assert the committed client artifact is in sync with src/
+        run: git diff --exit-code -- lib/
+      - name: Check whether this version is already published
+        id: existing
+        run: |
+          set -euo pipefail
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          set +e
+          OUTPUT="$(npm view "${NAME}@${VERSION}" version 2>&1)"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -eq 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif grep -q 'E404' <<<"$OUTPUT"; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$OUTPUT" >&2
+            exit "$STATUS"
+          fi
+      - name: Publish through npm OIDC
+        # --tag latest is deliberate: 0.1.9-patched.N is a prerelease, so npm
+        # would otherwise leave `latest` unset and a bare
+        # `dsh plugin add dsh-smooth-cursor-patched` would resolve to nothing.
+        if: steps.existing.outputs.skip != 'true'
+        run: npm publish --access public --provenance --tag latest
+      - name: Report idempotent skip
+        if: steps.existing.outputs.skip == 'true'
+        run: echo 'The exact package version already exists; no duplicate publish was attempted.'

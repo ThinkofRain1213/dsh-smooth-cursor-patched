@@ -2,37 +2,56 @@
 
 **中文 | [English](README.en.md)**
 
-一个为 [DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）打造的**平滑彗星光标（社区深度修复与增强版）**——把原生输入光标替换成一枚会随输入平滑滑动的发光彗星，支持自定义拖尾、强调色、粗细及 500ms 黄金呼吸节拍。
-
-> 本项目为 `dsh-smooth-cursor` 的本地增强修复版（Patched Edition），彻底根治了原版在空内容、软换行、划词方向、超长滚动及询问界面中的多项体验缺陷。
-
-![category](https://img.shields.io/badge/category-UI_Enhancement-orange)
+[![npm 版本](https://img.shields.io/npm/v/dsh-smooth-cursor-patched?label=npm&color=5965d8)](https://www.npmjs.com/package/dsh-smooth-cursor-patched)
+[![GitHub Release](https://img.shields.io/github/v/release/ThinkofRain1213/dsh-smooth-cursor-patched?label=release&color=5965d8)](https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/releases)
+[![构建检查](https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/actions/workflows/validate.yml/badge.svg)](https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+一个为 [DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）打造的**平滑彗星光标（社区修补版）**——把原生输入光标替换成一枚会随输入平滑滑动的发光彗星，支持自定义拖尾、强调色、粗细及 500ms 呼吸节拍。
+
+> **关于本仓库**
+> 这是 [Lacquervii/smooth-cursor](https://github.com/Lacquervii/smooth-cursor) 的个人修补分支。上游自 2026-09-09 起未再更新，故在此维护一份可用版本。
+> - 精力有限，不保证及时关注这个仓库，且随时可能断更
+> - 欢迎提 issue，但回复可能很慢
+> - 上游若恢复维护，我会优先回归上游
 
 ---
 
-## 核心特性与修复
+## 相对上游的改动
+
+上游 `dsh-smooth-cursor` 在以下场景存在可复现的缺陷，本分支逐项修复：
+
+- **空内容与初次聚焦保活** — 上游在空输入框或初次点击时，光标测量拿到零高度矩形，导致光标不显示。本分支为富文本输入框增加了分层测量与空行兜底。
+- **双向划词跟手** — 上游固定取选区第 0 个矩形，正向拖选（从左往右）时光标不跟鼠标。本分支按选区方向（`selectionDirection`）选择首/末矩形，并把选区终点与方向纳入重测签名。
+- **换行空行精准拦截** — 上游依赖 `range.getBoundingClientRect()`，在空行上会拿到 Chromium 回溯吸附的矩形，光标停留在上一行末尾。本分支在软换行与空段落处优先实测该行自身的 `<br>` 高度。
+- **视口物理纵向裁剪** — 上游没有裁剪，长文本滚动时超界光标会漂浮到聊天区或工具栏上方。本分支按输入框滚动视口剔除并裁切。
+- **覆盖询问界面** — 上游只覆盖 `textarea[data-phase]`。本分支同时覆盖 `ask_user_question` 交互卡片的作答输入框。
+
+此外新增：**光标呼吸（闪烁）**，对齐 VS Code / 原生 500ms 节拍（无操作 0.5 秒后呼吸，打字时常亮），可在设置中独立开关。
+
+---
+
+## 核心特性
 
 - **平滑彗星光标** — 平滑缓动，移动时光标优雅滑向目标字符位置。
 - **彗星拖尾** — 移动光标时带有渐细渐隐的粒子拖尾。
-- **光标闪烁呼吸（新增）** — 恢复并对齐 VS Code / 原生 500ms 黄金呼吸节拍，无操作 0.5 秒准时呼吸，打字时 100% 常亮，支持独立开关。
-- **空内容与初次聚焦保活（修复）** — 彻底解决原版空输入框或初次点击时光标彻底消失的 Bug。
-- **双向划词跟手（修复）** — 具备方向感知能力，无论正向拖选（从左往右）还是逆向拖选（从右往左），光标始终紧随鼠标指针。
-- **换行空行精准拦截（修复）** — 根治 `Shift + Enter` 换行到空行时光标停留在上一行末尾、打字才瞬移的 Chromium 回溯吸附缺陷。
-- **视口物理纵向裁剪（修复）** — 长文本输入滚动时，超界光标自动剔除与平滑裁切，绝不越界漂浮到聊天区或工具栏。
-- **覆盖询问界面（新增）** — 全面支持 `ask_user_question` 交互卡片的作答输入框。
+- **光标呼吸开关** — 500ms 节拍，可独立开关。
 - **浏览器本地持久化** — 设置保存于 `localStorage`，即开即用。
 
 ---
 
 ## 安装与使用
 
-### 作为 DSH 插件安装（推荐）
-
-通过 GitHub 一键安装：
+### 从 npm 安装（推荐）
 
 ```bash
-dsh plugin --profile web add github:ThinkofRain1213/smooth-cursor
+dsh plugin --profile web add dsh-smooth-cursor-patched
+```
+
+### 从 GitHub 安装
+
+```bash
+dsh plugin --profile web add github:ThinkofRain1213/dsh-smooth-cursor-patched
 ```
 
 安装后刷新或重启 `dsh web`，在 **设置 → 通用 → 输入光标** 中即可开启或微调各项参数。
@@ -42,8 +61,8 @@ dsh plugin --profile web add github:ThinkofRain1213/smooth-cursor
 克隆本仓库并作为插件 bundle 添加：
 
 ```bash
-git clone https://github.com/Lacquervii/smooth-cursor.git
-cd smooth-cursor
+git clone https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched.git
+cd dsh-smooth-cursor-patched
 pnpm install --ignore-scripts
 pnpm build
 ```
@@ -52,9 +71,11 @@ pnpm build
 
 ```yaml
 - insert:
-    - id: smooth-cursor
-      name: dsh-smooth-cursor
+    - id: smooth-cursor-patched
+      name: dsh-smooth-cursor-patched
 ```
+
+> 注意：`id` / `name` 必须与包名一致。改写为上游的 `smooth-cursor` / `dsh-smooth-cursor` 会与官方插件条目冲突，DSH 会因 loader id 重复而报 `Failed to load plugins`。
 
 ## 使用
 
@@ -68,11 +89,17 @@ pnpm build
 
 ```bash
 pnpm install --ignore-scripts
-pnpm build     # tsc 类型 + tsdown 打包（node 端 + 客户端）
-pnpm watch     # 增量重建
+pnpm run typecheck          # tsc 类型检查
+pnpm run build              # tsdown 打包（node 端 + 客户端）
+pnpm run check:register-id  # 校验 bundle 注册 id 与 patch name 一致
+pnpm run watch              # 增量重建
 ```
 
-`lib/` 已提交到仓库，即使包管理器阻止了 `prepare` 构建步骤，也能从 git 安装后直接运行。
+`lib/` 已提交到仓库，即使包管理器阻止了 `prepare` 构建步骤，也能从 git 安装后直接运行。提交前请确保 `pnpm run build` 之后 `lib/` 无未提交改动——CI 会校验已提交的产物与 `src/` 同步。
+
+## 测试
+
+本仓库目前**没有自动化测试**。CI 只覆盖类型检查、构建、注册 id 一致性与产物新鲜度；它不能证明光标在各浏览器中的实际行为，那部分依赖手动验证。
 
 ## 致谢
 

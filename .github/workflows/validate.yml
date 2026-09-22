@@ -1,0 +1,49 @@
+name: Validate
+
+# This plugin ships no automated tests yet, so the suite below is a build gate
+# rather than a behavioural one: types, bundling, the loader-id contract and
+# whether the committed `lib/` still matches `src/`. It cannot tell whether the
+# caret actually renders correctly in a browser — that is still verified by
+# hand. Tighten it when real tests exist.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Node ${{ matrix.node }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # tsdown 0.22 requires ^22.18.0 || >=24.11.0, so neither older Node 22
+        # nor Node 23 is usable here.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22.18.0, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.4.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - name: Install locked dependencies
+        # `prepare` builds and runs the register-id check, so this also proves
+        # the package installs and builds without an explicit build step.
+        run: pnpm install --frozen-lockfile
+      - name: Type-check the sources
+        run: pnpm run typecheck
+      - name: Build the node and client bundles
+        run: pnpm run build
+      - name: Assert the bundle's registration id matches the patch name
+        run: pnpm run check:register-id
+      - name: Assert the committed client artifact is in sync with src/
+        # The build is deterministic (verified byte-identical across runs), so a
+        # dirty `lib/` here means a source change was committed without its
+        # regenerated artifact.
+        run: git diff --exit-code -- lib/
