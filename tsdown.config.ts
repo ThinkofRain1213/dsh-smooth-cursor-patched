@@ -8,7 +8,7 @@
  * a <style data-plugin="smooth-cursor"> tag at factory execution.
  */
 import { readFile } from 'node:fs/promises'
-import { basename, dirname, resolve } from 'node:path'
+import { basename, dirname, relative, resolve, sep } from 'node:path'
 import { transform } from 'lightningcss'
 
 /** The module specifiers the DSH shell shares into the frozen module table. */
@@ -26,6 +26,26 @@ const CLIENT_EXTERNALS = [...PLATFORM_MODULES]
 /** Virtual-id wrapper keeping module CSS away from tsdown's own css pipeline. */
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
+
+/**
+ * Repo-relative, forward-slashed identity for a CSS file.
+ *
+ * Both the virtual module id and the `filename` handed to lightningcss must be
+ * this, never the absolute path. The absolute path leaked two ways:
+ *
+ *  1. rolldown prints a `//#region <id>` banner from the module id, so the
+ *     committed `lib/client.js` — which is published to npm — embedded the
+ *     build machine's path (e.g. `C:\Users\<user>\Desktop\<...>`).
+ *  2. lightningcss derives the CSS Module `[hash]` from `filename`, so the same
+ *     source produced different class names per checkout directory. The build
+ *     reproduced byte-for-byte on one machine but not across machines, which
+ *     made the "is the committed lib/ in sync with src/?" gate fail in CI.
+ *
+ * `process.cwd()` is the project root here by construction: `outDir` and every
+ * entry below are already cwd-relative.
+ */
+const cssIdentity = (absolutePath: string): string =>
+  relative(process.cwd(), absolutePath).split(sep).join('/')
 
 /** No shared runtime identity — inline-safe wire/type layers. */
 const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|session|llm|tools|brand)(\/|$)/
@@ -70,15 +90,19 @@ const client = {
     resolveId(source: string, importer: string | undefined) {
       if (!source.endsWith('.module.css')) return null
       const abs = importer !== undefined ? resolve(dirname(importer), source) : source
-      return CSS_VIRTUAL_PREFIX + abs + CSS_VIRTUAL_SUFFIX
+      return CSS_VIRTUAL_PREFIX + cssIdentity(abs) + CSS_VIRTUAL_SUFFIX
     },
     async load(virtualId: string) {
       if (!virtualId.startsWith(CSS_VIRTUAL_PREFIX)) return null
-      const fileId = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+      // The id carries the repo-relative identity (see cssIdentity); resolve it
+      // back to a real path only for reading and watching, so neither the
+      // emitted region banner nor the CSS Module hash can see the checkout root.
+      const identity = virtualId.slice(CSS_VIRTUAL_PREFIX.length, -CSS_VIRTUAL_SUFFIX.length)
+      const fileId = resolve(process.cwd(), identity)
       this.addWatchFile(fileId)
       const source = await readFile(fileId)
       const { code, exports: cssExports } = transform({
-        filename: fileId,
+        filename: identity,
         code: source,
         cssModules: { pattern: '[hash]_[local]' },
         minify: true,
