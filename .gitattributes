@@ -1,11 +1,20 @@
-# Build output under lib/ is compared byte-for-byte against the sources it was
-# generated from, so it must not be rewritten by end-of-line conversion.
-# Without this, core.autocrlf=true makes git report lib/client.js as modified
-# on a clean checkout (identical content and size, differing only in the EOL it
-# would apply on the next checkout), which breaks any "is the committed bundle
-# still in sync with src/?" check.
+# Normalise every text file to LF in the working tree.
 #
-# The bundle is emitted with LF on every platform, so declare it as LF rather
-# than "text" (which would normalise to the platform default on checkout).
-lib/*.js text eol=lf
-lib/*.js.map text eol=lf
+# This repository commits a built artifact (lib/) that must be byte-identical
+# to what a rebuild produces on any machine, and CI asserts exactly that with
+# `git diff --exit-code -- lib/`. Two things broke that on Windows with
+# core.autocrlf=true:
+#
+#  1. git reported lib/client.js as modified on a clean checkout — same size,
+#     same content, differing only in the EOL it would apply next checkout.
+#  2. lib/client.js.map embeds the sources verbatim in `sourcesContent`, so a
+#     CRLF working tree produced a map that Linux (LF) could never reproduce.
+#
+# Forcing LF everywhere makes the checkout — and therefore the artifact —
+# platform-independent. Source files are stored as LF in the index already, so
+# this changes the working tree, not history.
+* text=auto eol=lf
+
+# Media is binary; keep git from inspecting or converting it.
+*.png binary
+*.mp4 binary
