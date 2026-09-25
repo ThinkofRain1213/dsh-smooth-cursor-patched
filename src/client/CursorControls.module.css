@@ -1,42 +1,13 @@
-/* Input caret preference row: title + master switch, then stacked preference
- * items (typing-trail switch, color swatches, thickness picker). Mirrors the
- * Appearance row's hairline-separated card so the two sit naturally in
- * General. */
+/* Caret preference controls: master switch, then stacked preference items
+ * (comet-trail switch, blink switch, color swatches, thickness picker). The
+ * Plugins page draws the bundle's own title, version, and description above
+ * the section this body renders into, so the body carries no title chrome of
+ * its own. */
 
-.group {
+.panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
-}
-
-.titleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.title {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.titleText {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  color: var(--dsw-alias-label-primary);
-}
-
-.titleDesc {
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 18px;
-  color: var(--dsw-alias-label-tertiary);
 }
 
 .item {
@@ -76,6 +47,19 @@
 
 /* ── pill switch ────────────────────────────────────────────────────────── */
 
+/* Mirrors the official `@deepseek-ai/dsh-client-ui-primitives` Switch tokens so
+ * the control flips with the theme instead of blending into it. Two rules
+ * matter in dark mode:
+ *
+ *   - OFF track is `border-l3`, a translucent stroke colour (dark: #ffffff29),
+ *     not a solid fill token.
+ *   - The thumb is the brand colour's *contrast foreground*
+ *     (`label-primary-foreground`: #fff on light, #0f1115 on dark). A fixed
+ *     static swatch (e.g. neutral-bluish-50 = #f9fafb) is wrong: on dark the
+ *     brand track is also near-white, so track and thumb collapsed into one
+ *     solid pill and the state became unreadable.
+ */
+
 .switch {
   display: inline-flex;
   cursor: pointer;
@@ -99,34 +83,35 @@
   width: 36px;
   height: 20px;
   padding: 2px;
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-module-platform);
-  border: 1px solid var(--dsw-alias-border-l2);
-  transition: background 0.16s ease, border-color 0.16s ease;
+  border: 0;
+  border-radius: 999px;
+  /* The capsule opts out of the global superellipse, like the official track. */
+  corner-shape: round;
+  background: var(--dsw-alias-border-l3);
+  transition: background 0.12s ease;
 }
 
 .switchThumb {
   display: block;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--dsw-alias-label-secondary);
+  corner-shape: round;
+  background: var(--dsw-alias-label-primary-foreground);
   transform: translateX(0);
-  transition: transform 0.16s ease, background 0.16s ease;
+  transition: transform 0.12s ease;
 }
 
 .switchInput:checked + .switchTrack {
   background: var(--dsw-alias-brand-primary);
-  border-color: transparent;
 }
 
 .switchInput:checked + .switchTrack .switchThumb {
-  background: var(--dsw-static-neutral-bluish-50);
   transform: translateX(16px);
 }
 
 .switchInput:focus-visible + .switchTrack {
-  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
 

@@ -7,13 +7,13 @@
  * A Host-backed namespace can adopt this later without changing the shape.
  */
 
-/** Caret thicknesses accepted at the settings row and engine boundaries. */
+/** Caret thicknesses accepted at the configuration panel and engine boundaries. */
 export const CURSOR_SIZES = ['small', 'medium', 'large'] as const
 
 /** One selectable caret thickness. */
 export type CursorSize = (typeof CURSOR_SIZES)[number]
 
-/** Durable caret-effect preference set owned by the Appearance surface. */
+/** Durable caret-effect preference set owned by the configuration panel. */
 export interface CursorSettings {
   /** Master switch: render the custom caret in the chat input. */
   enabled: boolean
@@ -30,7 +30,7 @@ export interface CursorSettings {
 /** Default accent — the DeepSeek brand blue (--dsw-static-deepseek-500). */
 export const DEFAULT_CURSOR_COLOR = '#4176E6'
 
-/** Preset swatches offered by the settings row, each legible on light and dark. */
+/** Preset swatches offered by the configuration panel, each legible on light and dark. */
 export const CURSOR_COLOR_SWATCHES: readonly string[] = Object.freeze([
   '#4176E6', // DeepSeek blue
   '#22D3EE', // cyan

@@ -57,7 +57,12 @@ dsh plugin --profile web add dsh-smooth-cursor-patched
 dsh plugin --profile web add github:ThinkofRain1213/dsh-smooth-cursor-patched
 ```
 
-Then restart `dsh web` and find the **Input caret** row under **Settings → General**.
+Then restart `dsh web`. Open **Plugins → dsh-smooth-cursor-patched**: the preferences are the bundle's own configuration section, between its description and its components.
+
+> **Requires DSH 0.1.6-alpha.2 or later.**
+> The per-plugin configuration page comes from `@deepseek-ai/dsh-client-ui-plugin-manager`, first published as `0.1.6-alpha.2`, which declares the `plugins.bundle.config` slot. DSH 0.1.5 and earlier ship no plugin manager, so that slot does not exist there — the plugin then renders no configuration section (the caret effect itself is unaffected and keeps using its existing `localStorage` preference).
+>
+> From this release the plugin offers **one** configuration surface, the Plugins page: the former **Settings → General** Input caret row has been removed so the same switches cannot appear twice.
 
 ### Manual (local development)
 
@@ -82,9 +87,10 @@ Then register it in your profile's `cordis.patch.yml`:
 
 ## Usage
 
-The effect activates whenever the composer textarea has focus. Open **Settings → General → Input caret** to:
+The effect activates whenever the composer textarea has focus. Open **Plugins → dsh-smooth-cursor-patched** and use the configuration section to:
 
 - Toggle the whole effect or just the comet trail.
+- Toggle caret blinking while idle.
 - Pick an accent color from the swatches, or use the custom color picker.
 - Choose the caret thickness.
 

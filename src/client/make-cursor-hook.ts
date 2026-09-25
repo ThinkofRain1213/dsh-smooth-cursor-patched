@@ -1,5 +1,5 @@
 /**
- * App-local snapshot-to-React binding for the settings row, built directly on
+ * App-local snapshot-to-React binding for the configuration panel, built directly on
  * React 18's stable `useSyncExternalStore`. This deliberately replaces the
  * official `bindSnapshotSelector` (from `@deepseek-ai/dsh-client-ui-renderer`)
  * so the plugin depends only on the stable ObservableSnapshot contract shipped

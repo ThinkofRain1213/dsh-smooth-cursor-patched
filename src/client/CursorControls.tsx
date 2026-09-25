@@ -1,19 +1,23 @@
 /**
- * Chat-input caret preference row registered into the General settings
- * section: master + comet-trail switches, accent color swatches with a custom
- * picker, and a thickness picker. Live values come from the controller's
- * snapshot store; writes route back through the injected faces and persist in
- * localStorage.
+ * The caret preference controls: master switch, comet-trail switch, blink
+ * switch, accent swatches with a custom picker, and the thickness picker.
+ *
+ * These render into the Plugins page's bundle-configuration section, whose page
+ * already draws the bundle's icon, title, version, description, and crumb above
+ * the section — so the body carries no title chrome of its own.
+ *
+ * Live values come from the controller's snapshot store; writes route back
+ * through the injected faces and persist in localStorage.
  */
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { CURSOR_COLOR_SWATCHES, CURSOR_SIZES, type CursorSize } from './cursor-settings.ts'
-import type { CursorRowState } from './cursor-controller.ts'
-import css from './CursorRow.module.css'
+import type { CursorPanelState } from './cursor-controller.ts'
+import css from './CursorControls.module.css'
 
-/** Registration-side business face for the row. */
-export interface CursorRowInjected {
+/** Registration-side business face for the controls. */
+export interface CursorControlsInjected {
   /** Bound snapshot selector hook, created by the apply side via bindSnapshotSelector. */
-  useCursor: <T>(selector: (state: CursorRowState) => T) => T
+  useCursor: <T>(selector: (state: CursorPanelState) => T) => T
   /** Toggle the whole effect. */
   setEnabled: (enabled: boolean) => void
   /** Toggle the comet trail. */
@@ -26,11 +30,10 @@ export interface CursorRowInjected {
   setSize: (size: CursorSize) => void
 }
 
-/** Full component props. */
-export type CursorRowProps =
-  PropsRuntime<'settings.general.item'>
-  & PropsLocale<'settings.cursor-effect'>
-  & InjectFace<CursorRowInjected>
+/** Props of the caret controls: the locale seat plus the injected business face. */
+export type CursorControlsProps =
+  PropsLocale<'cursor-effect'>
+  & InjectFace<CursorControlsInjected>
 
 interface SwitchProps {
   checked: boolean
@@ -55,17 +58,19 @@ function Switch({ checked, onChange, label }: SwitchProps) {
   )
 }
 
-/** Render the Input caret preference row. */
-export function CursorRow({ t, useCursor, setEnabled, setTrail, setBlink, setColor, setSize }: CursorRowProps) {
+/** Render the caret preference rows, without any surrounding section chrome. */
+export function CursorControls({ t, useCursor, setEnabled, setTrail, setBlink, setColor, setSize }: CursorControlsProps) {
   const settings = useCursor(state => state.settings)
   return (
-    <div className={css.group}>
-      <div className={css.titleRow}>
-        <div className={css.title}>
-          <span className={css.titleText}>{t('cursor.title')}</span>
-          <span className={css.titleDesc}>{t('cursor.titleDescription')}</span>
-        </div>
-        <Switch checked={settings.enabled} onChange={setEnabled} label={t('cursor.enabled')} />
+    <>
+      <div className={css.item}>
+        <span className={css.itemText}>
+          <span className={css.itemTitle}>{t('cursor.title')}</span>
+          <span className={css.itemDesc}>{t('cursor.titleDescription')}</span>
+        </span>
+        <span className={css.itemControl}>
+          <Switch checked={settings.enabled} onChange={setEnabled} label={t('cursor.enabled')} />
+        </span>
       </div>
 
       <div className={css.item}>
@@ -137,6 +142,6 @@ export function CursorRow({ t, useCursor, setEnabled, setTrail, setBlink, setCol
           ))}
         </div>
       </div>
-    </div>
+    </>
   )
 }
