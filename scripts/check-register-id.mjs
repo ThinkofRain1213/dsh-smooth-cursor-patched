@@ -52,6 +52,8 @@ function bundleIds(text) {
 
 const names = patchNames(patchText)
 const ids = bundleIds(clientText)
+/** The bundle's own id: the patch name and the loader id must agree on it. */
+const expected = names[0]
 
 if (names.length === 0) {
   console.error('[check-register-id] 未在 cordis.patch.yml 中找到 insert 的 name。请检查 patch 格式。')
@@ -68,4 +70,48 @@ if (missing.length > 0) {
   process.exit(1)
 }
 
-console.log('[check-register-id] OK —— bundle 注册 id 与 patch name 一致。')
+/**
+ * 防回归校验之二：光标引擎给自建 <style> 打的归属标记必须等于包名。
+ *
+ * DSH 的客户端模块系统会把所有「无主的」<style>（即没有 data-plugin 的）
+ * 打上「下一个 materialize 的插件」的名字，并在那个**别的**插件被禁用时
+ * 一并删除。归属标记一旦写错或缺失，样式会在无关插件的拆除中被删掉，
+ * 遮罩退化为文档流元素、页面被撑高。这里把它钉死在包名上。
+ *
+ * 注意产物里有两处 dataset.plugin：tsdown 注入的 CSS Modules 标签（字面量）
+ * 和引擎自建标签（`this.style.dataset.plugin = PLUGIN_ID`）。真正承重的是
+ * 后者，所以这里解析标识符而不能只匹配字面量。
+ */
+const engineStamp = clientText.match(/this\.style\.dataset\.plugin\s*=\s*([A-Za-z_$][\w$]*|["'][^"']+["'])\s*;?/)
+if (engineStamp === null) {
+  console.error('[check-register-id] ✗ bundle 中未找到光标引擎的 <style> 归属标记。')
+  console.error('  引擎会给自建 <style> 打 data-plugin 以防被其他插件连带删除；标记缺失时该防线失效，')
+  console.error('  禁用无关插件会删掉遮罩样式，导致页面被撑高。')
+  process.exit(1)
+}
+
+/** Resolve the assignment's right-hand side to its literal string. */
+function resolveStamp(raw) {
+  const quoted = raw.match(/^["']([^"']+)["']$/)
+  if (quoted !== null) return quoted[1]
+  const binding = clientText.match(new RegExp(`(?:const|var|let)\\s+${raw}\\s*=\\s*["']([^"']+)["']`))
+  return binding !== null ? binding[1] : null
+}
+
+const stampValue = resolveStamp(engineStamp[1])
+
+if (stampValue === null) {
+  console.error(`[check-register-id] ✗ 无法解析 <style> 归属标记 ${engineStamp[1]} 的字面值。`)
+  console.error('  该标识符应绑定到一个字符串常量；解析不到时无法证明它等于包名，故按失败处理。')
+  process.exit(1)
+}
+
+if (stampValue !== expected) {
+  console.error('[check-register-id] ✗ <style> 归属标记与包名不一致：')
+  console.error(`  期望（patch name）: ${expected}`)
+  console.error(`  实际（引擎标记）  : ${stampValue}`)
+  console.error('  标记错误会让样式在无关插件被禁用时被删除，导致页面被遮罩撑高。')
+  process.exit(1)
+}
+
+console.log('[check-register-id] OK —— bundle 注册 id 与 patch name 一致，<style> 归属标记一致。')

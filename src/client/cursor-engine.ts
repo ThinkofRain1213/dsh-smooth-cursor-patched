@@ -22,6 +22,19 @@ import type { CursorSettings, CursorSize } from './cursor-settings.ts'
 
 const OVERLAY_ID = 'dsh-client-cursor-overlay'
 const STYLE_ID = 'dsh-client-cursor-style'
+/**
+ * Owner tag this package stamps on the `<style>` tag it injects, and the value
+ * the client module system must find there.
+ *
+ * The module system tags every UNCLAIMED `<style>` in the document with the id
+ * of whichever plugin materializes next (`claimStyles`), then deletes those
+ * tags when that unrelated plugin is disabled (`removeOwnedStyles`). An
+ * untagged stylesheet is therefore torn down by another plugin's teardown,
+ * which is exactly how the overlay lost its `position: fixed` and stretched the
+ * page. Must equal the package name, i.e. the loader id the bundle patch
+ * declares.
+ */
+const PLUGIN_ID = 'dsh-smooth-cursor-patched'
 
 /** The legacy chat composer textarea, identified by its phase attribute. */
 const TEXTAREA_SELECTOR = 'textarea[data-phase]'
@@ -49,6 +62,9 @@ const SNAP_EPSILON = 0.1
 const COMET_MOVE_THRESHOLD = 0.2
 
 const CARET_CSS = `
+/* The overlay's geometry is ALSO set inline (see the constructor): this rule is
+ * belt-and-braces, kept so the effect still lays out correctly if the stylesheet
+ * is replaced by a newer build while an old canvas is still mounted. */
 #${OVERLAY_ID} {
   position: fixed;
   inset: 0;
@@ -56,7 +72,8 @@ const CARET_CSS = `
   pointer-events: none;
 }
 #${OVERLAY_ID}[data-active='false'] { display: none; }
-/* Hide the native caret on every surface the effect owns. */
+/* Hide the native caret on every surface the effect owns. This is the one rule
+ * that cannot move inline: it targets the composer, not the canvas. */
 html.dsh-cursor-active textarea[data-phase],
 html.dsh-cursor-active [data-composer-input],
 html.dsh-cursor-active [data-question-key] textarea,
@@ -368,6 +385,13 @@ export class CursorEngine {
   private readonly ctx: CanvasRenderingContext2D | undefined
   private readonly style: HTMLStyleElement | undefined
 
+  /**
+   * Per-instance identity for the shared `dsh-cursor-active` flag on
+   * `<html>`. The flag is global but each engine owns one instance, so the
+   * token decides which instance is allowed to clear it (see dispose).
+   */
+  private readonly ownerToken = Math.random().toString(36).slice(2)
+
   private raf = 0
   /** Whether the draw loop is scheduled (started on the first enabling apply). */
   private running = false
@@ -417,12 +441,28 @@ export class CursorEngine {
 
     this.style = document.createElement('style')
     this.style.id = STYLE_ID
+    // Claim the tag as this package's own BEFORE it enters the document, so
+    // claimStyles() skips it and removeOwnedStyles() only ever retires it for
+    // this plugin. See PLUGIN_ID.
+    this.style.dataset.plugin = PLUGIN_ID
     this.style.textContent = CARET_CSS
     document.head.appendChild(this.style)
 
     this.overlay = document.createElement('canvas')
     this.overlay.id = OVERLAY_ID
     this.overlay.dataset.active = 'false'
+    // Pin the overlay out of flow with inline styles rather than relying on
+    // CARET_CSS alone. The canvas buffer is sized to the viewport (x dpr), so if
+    // the companion stylesheet is ever removed the element becomes flow content
+    // and stretches the document: the app scrolls, content is pushed up, and
+    // blank space opens below the composer. Inline geometry keeps the failure
+    // mode at worst "caret colours the composer" instead of a broken page.
+    this.overlay.style.position = 'fixed'
+    this.overlay.style.inset = '0'
+    this.overlay.style.zIndex = '2147483000'
+    this.overlay.style.pointerEvents = 'none'
+    // Hidden until an enabling apply(); mirrors [data-active='false'] in CSS.
+    this.overlay.style.display = 'none'
     this.ctx = this.overlay.getContext('2d') ?? undefined
     document.body.appendChild(this.overlay)
 
@@ -447,10 +487,16 @@ export class CursorEngine {
       caf(this.raf)
       this.running = false
       this.overlay.dataset.active = 'false'
+      this.overlay.style.display = 'none'
+      // Release the flag only if this instance still holds it, so disabling the
+      // effect does not clear a newer instance's claim under HMR.
+      if (root.dataset.cursorOwner === this.ownerToken) delete root.dataset.cursorOwner
       this.clear()
       return
     }
+    root.dataset.cursorOwner = this.ownerToken
     this.overlay.dataset.active = 'true'
+    this.overlay.style.display = 'block'
     if (!this.running) {
       this.running = true
       this.initialized = false
@@ -469,7 +515,15 @@ export class CursorEngine {
     document.removeEventListener('compositionend', this.onCompositionEnd, { capture: true })
     this.overlay.remove()
     this.style?.remove()
-    document.documentElement.classList.remove('dsh-cursor-active')
+    const root = document.documentElement
+    // Only the instance that currently holds the flag may clear it. Under an
+    // HMR reload a fresh engine can have enabled the effect before this disposer
+    // runs; an unconditional removal would switch the native caret back on while
+    // the new instance keeps drawing the comet.
+    if (root.dataset.cursorOwner === this.ownerToken) {
+      root.classList.remove('dsh-cursor-active')
+      delete root.dataset.cursorOwner
+    }
   }
 
   /** One animation frame: size, measure, ease, draw. */
@@ -483,6 +537,19 @@ export class CursorEngine {
     const ctx = this.ctx
     if (this.overlay === undefined || ctx === undefined) return
     if (!this.settings.enabled) return
+
+    // Self-heal the companion stylesheet. `caret-color: transparent` can only be
+    // expressed as a rule over the composer element, so losing the tag would
+    // bring the native caret back beside the comet. `isConnected` is a property
+    // read rather than a DOM query, so re-checking it every frame is free.
+    if (this.style !== undefined && !this.style.isConnected) {
+      document.head.appendChild(this.style)
+      const root = document.documentElement
+      root.classList.add('dsh-cursor-active')
+      // Re-assert ownership too: whatever removed the tag may have cleared the
+      // flag, and dispose() only releases a flag this instance still holds.
+      root.dataset.cursorOwner = this.ownerToken
+    }
 
     this.resize()
     const width = window.innerWidth
