@@ -48,8 +48,7 @@
 /* ── pill switch ────────────────────────────────────────────────────────── */
 
 /* Mirrors the official `@deepseek-ai/dsh-client-ui-primitives` Switch tokens so
- * the control flips with the theme instead of blending into it. Two rules
- * matter in dark mode:
+ * the control flips with the theme instead of blending into it:
  *
  *   - OFF track is `border-l3`, a translucent stroke colour (dark: #ffffff29),
  *     not a solid fill token.
@@ -58,6 +57,11 @@
  *     static swatch (e.g. neutral-bluish-50 = #f9fafb) is wrong: on dark the
  *     brand track is also near-white, so track and thumb collapsed into one
  *     solid pill and the state became unreadable.
+ *   - While OFF, the thumb uses `switch-thumb` — the token the official
+ *     stylesheet added in 0.2.0-rc.1, which softens the resting thumb to a mid
+ *     grey (#adb2b8) on dark. It does not exist before that release, so the
+ *     fallback keeps the previous contrast foreground and older DSH builds
+ *     render exactly as they did.
  */
 
 .switch {
@@ -104,6 +108,12 @@
 
 .switchInput:checked + .switchTrack {
   background: var(--dsw-alias-brand-primary);
+}
+
+/* Resting thumb: the official 0.2.0-rc.1+ token, with the older contrast
+ * foreground as the fallback so DSH < 0.2.0-rc.1 keeps its previous look. */
+.switchInput:not(:checked) + .switchTrack .switchThumb {
+  background: var(--dsw-alias-switch-thumb, var(--dsw-alias-label-primary-foreground));
 }
 
 .switchInput:checked + .switchTrack .switchThumb {
