@@ -18,8 +18,6 @@ import css from './CursorControls.module.css'
 export interface CursorControlsInjected {
   /** Bound snapshot selector hook, created by the apply side via bindSnapshotSelector. */
   useCursor: <T>(selector: (state: CursorPanelState) => T) => T
-  /** Toggle the whole effect. */
-  setEnabled: (enabled: boolean) => void
   /** Toggle the comet trail. */
   setTrail: (trail: boolean) => void
   /** Toggle caret blinking while idle. */
@@ -59,17 +57,17 @@ function Switch({ checked, onChange, label }: SwitchProps) {
 }
 
 /** Render the caret preference rows, without any surrounding section chrome. */
-export function CursorControls({ t, useCursor, setEnabled, setTrail, setBlink, setColor, setSize }: CursorControlsProps) {
+export function CursorControls({ t, useCursor, setTrail, setBlink, setColor, setSize }: CursorControlsProps) {
   const settings = useCursor(state => state.settings)
   return (
     <>
       <div className={css.item}>
         <span className={css.itemText}>
-          <span className={css.itemTitle}>{t('cursor.title')}</span>
-          <span className={css.itemDesc}>{t('cursor.titleDescription')}</span>
+          <span className={css.itemTitle}>{t('cursor.blink')}</span>
+          <span className={css.itemDesc}>{t('cursor.blinkDescription')}</span>
         </span>
         <span className={css.itemControl}>
-          <Switch checked={settings.enabled} onChange={setEnabled} label={t('cursor.enabled')} />
+          <Switch checked={settings.blink} onChange={setBlink} label={t('cursor.blink')} />
         </span>
       </div>
 
@@ -80,16 +78,6 @@ export function CursorControls({ t, useCursor, setEnabled, setTrail, setBlink, s
         </span>
         <span className={css.itemControl}>
           <Switch checked={settings.trail} onChange={setTrail} label={t('cursor.trail')} />
-        </span>
-      </div>
-
-      <div className={css.item}>
-        <span className={css.itemText}>
-          <span className={css.itemTitle}>{t('cursor.blink')}</span>
-          <span className={css.itemDesc}>{t('cursor.blinkDescription')}</span>
-        </span>
-        <span className={css.itemControl}>
-          <Switch checked={settings.blink} onChange={setBlink} label={t('cursor.blink')} />
         </span>
       </div>
 

@@ -524,8 +524,12 @@ export class CursorEngine {
 
   /**
    * Apply one effect preference: color, thickness, trail switch, and the
-   * native-caret lock. While enabled, a synchronous pass renders
-   * immediately against the current focus.
+   * native-caret lock. A synchronous pass renders immediately against the
+   * current focus.
+   *
+   * There is no enabled branch here: whether the effect runs at all is decided
+   * by the plugin's own enable switch, which controls whether this bundle is
+   * loaded. Once loaded, the engine is always on.
    */
   apply(settings: CursorSettings): void {
     this.settings = settings
@@ -534,18 +538,7 @@ export class CursorEngine {
     this.overlay.dataset.size = settings.size
 
     const root = document.documentElement
-    root.classList.toggle('dsh-cursor-active', settings.enabled)
-    if (!settings.enabled) {
-      caf(this.raf)
-      this.running = false
-      this.overlay.dataset.active = 'false'
-      this.overlay.style.display = 'none'
-      // Release the flag only if this instance still holds it, so disabling the
-      // effect does not clear a newer instance's claim under HMR.
-      if (root.dataset.cursorOwner === this.ownerToken) delete root.dataset.cursorOwner
-      this.clear()
-      return
-    }
+    root.classList.add('dsh-cursor-active')
     root.dataset.cursorOwner = this.ownerToken
     this.overlay.dataset.active = 'true'
     this.overlay.style.display = 'block'
@@ -588,7 +581,6 @@ export class CursorEngine {
   private renderOnce(): void {
     const ctx = this.ctx
     if (this.overlay === undefined || ctx === undefined) return
-    if (!this.settings.enabled) return
 
     // Self-heal the companion stylesheet. `caret-color: transparent` can only be
     // expressed as a rule over the composer element, so losing the tag would

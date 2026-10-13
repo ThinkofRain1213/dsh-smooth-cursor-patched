@@ -2,9 +2,6 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'cursor.title': '输入光标',
-  'cursor.titleDescription': '聊天输入框的文字光标',
-  'cursor.enabled': '呼吸光标',
   'cursor.trail': '彗星拖尾',
   'cursor.trailDescription': '移动时在光标后带出一串渐隐尾迹',
   'cursor.blink': '光标闪烁',
@@ -22,9 +19,6 @@ export type CursorKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'cursor.title': 'Input caret',
-  'cursor.titleDescription': 'Animated caret for the chat input',
-  'cursor.enabled': 'Breathing caret',
   'cursor.trail': 'Comet trail',
   'cursor.trailDescription': 'Trails a fading tail behind the caret as it moves',
   'cursor.blink': 'Caret blinking',

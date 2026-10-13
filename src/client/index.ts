@@ -50,7 +50,6 @@ export function apply(ctx: import('@deepseek-ai/cordis').Context): void {
     locale: NS,
     inject: (): CursorControlsInjected => ({
       useCursor: bindSnapshotSelector(controller.state),
-      setEnabled: (value) => { controller.setEnabled(value) },
       setTrail: (value) => { controller.setTrail(value) },
       setBlink: (value) => { controller.setBlink(value) },
       setColor: (value) => { controller.setColor(value) },

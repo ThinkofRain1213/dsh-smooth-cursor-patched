@@ -15,8 +15,6 @@ export type CursorSize = (typeof CURSOR_SIZES)[number]
 
 /** Durable caret-effect preference set owned by the configuration panel. */
 export interface CursorSettings {
-  /** Master switch: render the custom caret in the chat input. */
-  enabled: boolean
   /** Comet trail: on = a fading tail; off = bare caret. */
   trail: boolean
   /** Blinking caret: on = blinks when idle, steady while typing; off = always solid. */
@@ -42,9 +40,8 @@ export const CURSOR_COLOR_SWATCHES: readonly string[] = Object.freeze([
   '#F8FAFC', // near-white
 ])
 
-/** The effect defaults: on, trail on, blink on, brand-blue, medium. */
+/** The effect defaults: trail on, blink on, brand-blue, medium. */
 export const DEFAULT_CURSOR_SETTINGS: CursorSettings = Object.freeze({
-  enabled: true,
   trail: true,
   blink: true,
   color: DEFAULT_CURSOR_COLOR,
@@ -63,11 +60,16 @@ function isColor(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value)
 }
 
-/** Merge a partially-typed persisted section onto the defaults. */
+/**
+ * Merge a partially-typed persisted section onto the defaults.
+ *
+ * A persisted `enabled` field is deliberately ignored, not honoured: the plugin's
+ * own enable switch is the single master, so a stored `false` from an older build
+ * must not leave the effect permanently off with no control left to turn it back on.
+ */
 function normalize(input: Partial<CursorSettings> | null | undefined): CursorSettings {
   const source = input ?? {}
   return {
-    enabled: typeof source.enabled === 'boolean' ? source.enabled : DEFAULT_CURSOR_SETTINGS.enabled,
     trail: typeof source.trail === 'boolean' ? source.trail : DEFAULT_CURSOR_SETTINGS.trail,
     blink: typeof source.blink === 'boolean' ? source.blink : DEFAULT_CURSOR_SETTINGS.blink,
     color: isColor(source.color) ? source.color : DEFAULT_CURSOR_SETTINGS.color,

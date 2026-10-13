@@ -2,35 +2,67 @@
  * (comet-trail switch, blink switch, color swatches, thickness picker). The
  * Plugins page draws the bundle's own title, version, and description above
  * the section this body renders into, so the body carries no title chrome of
- * its own. */
+ * its own.
+ *
+ * ── Row type and spacing follow the sibling plugin card ────────────────────
+ * Every value below is copied from `dsh-project-groups`'
+ * `settings-card.module.css`, whose own comments trace each one back to the
+ * official plugin cards it was measured against. Both cards render into the
+ * same `plugins.bundle.config` slot, so they must read as one surface:
+ *
+ *   `.rowText { gap: 6px }` → title/hint pair, 6px on both official cards
+ *   `.row    { gap: 8px; padding: 16px 0 }` → the official settings-row block
+ *   `.title  { 13px/500/19.5px }` → `终端` and `子智能体` row labels
+ *   `.desc   { 12px/400/18px }`  → the same two cards' hints
+ *   `.cubeRow { gap: 8px }` → the spec's value for a row of peer controls
+ *
+ * The 500 weight is what separates a label from its hint; the 19.5px line
+ * height is 1.5 × 13px, the ratio the whole spec uses. */
 
+/* `gap: 0` is deliberate, and it is the spec's own design: each row carries
+ * its own `padding: 16px 0` instead of the parent spacing them. The shared
+ * `detailSection` container applies its own `gap: 12px` to this panel's
+ * children, and a row's own padding is what takes the card out of its reach —
+ * two neighbouring rows then sit 16 + 16 = 32px apart, as the spec intends. */
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
+/* The official settings-row block: 8px between the text column and the
+ * control, 16px above and below the row itself. */
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  padding: 16px 0;
 }
 
+/* The name/description pair. `gap: 6px` is what both official plugin cards use
+ * between a row label and its hint, so this is a copied value rather than a
+ * chosen one. `padding-right` keeps the text from running up against the
+ * control on a long hint — also the spec's `.rowText` value. */
 .itemText {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  padding-right: 48px;
 }
 
+/* A setting's name: 13px/500/19.5px, the official plugin-card row label. The
+ * 500 weight is what tells a label from its hint. */
 .itemTitle {
   font-size: 13px;
-  font-weight: 400;
-  line-height: 20px;
+  font-weight: 500;
+  line-height: 19.5px;
   color: var(--dsw-alias-label-primary);
 }
 
+/* A row's hint: 12px/400/18px in `label-tertiary`, the value both official
+ * plugin cards use, and the same 1.5× line-height ratio as the title. */
 .itemDesc {
   font-size: 12px;
   font-weight: 400;
@@ -38,11 +70,13 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* A cluster of peer controls (swatches, thickness pills). 8px is the spec's
+ * value for siblings in one row (`.cubeRow`, `.specRow`). */
 .itemControl {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 /* ── pill switch ────────────────────────────────────────────────────────── */
@@ -166,6 +200,14 @@
   cursor: pointer;
 }
 
+/* The custom-colour affordance: a "…" vertically centred inside the 24px
+ * swatch circle.
+ *
+ * `line-height: 1` is a centring technique here, not a typographic value —
+ * the glyph box is collapsed so `align-items: center` lands it on the circle's
+ * middle. The spec has no counterpart (it ships no such swatch), so this is the
+ * one declaration on this surface that deliberately does not follow it. The
+ * 12px size does match, and is the spec's hint size. */
 .customOverlay {
   font-size: 12px;
   line-height: 1;
@@ -175,15 +217,22 @@
 
 /* ── thickness picker ───────────────────────────────────────────────────── */
 
+/* Type matches `.itemTitle` — 13px/500/19.5px — because it shares a row with
+ * one, which is the spec's own stated reason for its `.selector` value: a
+ * differently-sized value beside a 13px name reads as two kinds of text in one
+ * line. `padding: 0 14px` is that selector's horizontal padding. The 28px
+ * height is this control's own geometry (a segmented pill, not the spec's
+ * 36px menu trigger), and is left alone as it is neither type nor spacing. */
 .sizeOption {
   height: 28px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 14px;
   background: transparent;
   font: inherit;
-  font-size: 12px;
-  line-height: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 19.5px;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
 }
