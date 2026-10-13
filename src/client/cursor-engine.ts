@@ -188,6 +188,21 @@ function isSelectionForward(selection: Selection): boolean {
   return (pos & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 }
 
+/** The nearest preceding `<br>` sibling of a text node's line, or null when there is none. */
+function precedingLineBreak(node: Node, host: HTMLElement): Element | null {
+  let el: Node | null = node
+  while (el !== null && el !== host) {
+    for (let sib = el.previousSibling; sib !== null; sib = sib.previousSibling) {
+      if (sib instanceof Element && sib.tagName === 'BR') return sib
+      // Any painted content before this point means the caret is not right after a break.
+      if (sib.nodeType === Node.TEXT_NODE && (sib.textContent ?? '').length > 0) return null
+      if (sib instanceof Element && sib.tagName !== 'BR') return null
+    }
+    el = el.parentNode
+  }
+  return null
+}
+
 /**
  * Measure a modern contenteditable composer caret from the live selection range
  * with robust multi-tiered fallbacks. Keeps initial caret height identical to typed text.
@@ -296,6 +311,43 @@ function measureRichCaret(host: HTMLElement): CursorPoint | null {
             left: lineStartLeft,
             top: pRect.top + halfLeading,
             height: emptyLineHeight,
+          }
+        }
+      }
+    }
+
+    // Case C: The caret sits in a TEXT node — the shape DSH's composer actually produces.
+    //
+    // Lexical keeps each run in a `<span data-lexical-text>`, so the selection focus is a
+    // `#text` node rather than an element. The element guard above therefore never matched
+    // in DSH, and the caret fell through to Tier 3, which reports the bounding box of the
+    // WHOLE multi-line `<span>` — that is the span's FIRST line, one line above the caret
+    // whenever the caret is further down. With a `<br>` (Shift+Enter) involved, the caret
+    // landed exactly one line low: measured +26px (one 24px line + 2px half-leading).
+    //
+    // A caret at the very start of a run that follows a `<br>` owns no client rect at all
+    // (the browser reports an empty rect list for it). It sits on the line the break
+    // opened — i.e. one line below that `<br>` — which is exactly what Case A computes for
+    // element anchors. Reuse that formula here so both anchor shapes agree.
+    if (focusNode !== null && focusNode.nodeType === Node.TEXT_NODE && host.contains(focusNode)) {
+      // Only when the caret has no geometry of its own; otherwise Tier 1 already returned.
+      const collapsedRect = range.getClientRects()[0] ?? range.getBoundingClientRect()
+      const hasOwnGeometry = collapsedRect !== undefined
+        && (collapsedRect.width > 0 || collapsedRect.height > 0 || collapsedRect.top > 0 || collapsedRect.left > 0)
+
+      if (!hasOwnGeometry) {
+        const precedingBr = precedingLineBreak(focusNode, host)
+        // The caret must sit IMMEDIATELY after that break. Any `\n` between them means the
+        // caret is one or more whole lines further down, where this formula would undershoot.
+        const before = (focusNode.textContent ?? '').slice(0, offset)
+        if (precedingBr !== null && !before.includes('\n')) {
+          const brRect = precedingBr.getBoundingClientRect()
+          if (brRect.top > 0) {
+            return {
+              left: lineStartLeft,
+              top: brRect.top + defaultLineHeight,
+              height: brRect.height > 0 ? brRect.height : expectedCaretHeight,
+            }
           }
         }
       }
