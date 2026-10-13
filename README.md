@@ -7,7 +7,7 @@
 [![构建检查](https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/actions/workflows/validate.yml/badge.svg)](https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-一个为 [DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）打造的**平滑彗星光标（社区修补版）**——把原生输入光标替换成一枚会随输入平滑滑动的发光彗星，支持自定义拖尾、强调色、粗细及 500ms 呼吸节拍。
+一个为 [DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）打造的**平滑光标（社区修补版）**——把原生输入光标替换成一枚会随输入平滑滑动的光标，支持强调色、粗细及 500ms 呼吸节拍。
 
 > **关于本仓库**
 > 这是 [Lacquervii/smooth-cursor](https://github.com/Lacquervii/smooth-cursor) 的个人修补分支。上游自 2026-09-09 起未再更新，故在此维护一份可用版本。
@@ -33,8 +33,7 @@
 
 ## 核心特性
 
-- **平滑彗星光标** — 平滑缓动，移动时光标优雅滑向目标字符位置。
-- **彗星拖尾** — 移动光标时带有渐细渐隐的粒子拖尾。
+- **平滑光标** — 平滑缓动，移动时光标优雅滑向目标字符位置。
 - **光标呼吸开关** — 500ms 节拍，可独立开关。
 - **浏览器本地持久化** — 设置保存于 `localStorage`，即开即用。
 
@@ -86,7 +85,7 @@ pnpm build
 
 当输入框获得焦点时特效即生效。打开 **插件 → 本插件** 的配置区可以：
 
-- 开关整个特效、彗星拖尾或光标闪烁。
+- 开关光标闪烁。
 - 从色板选择强调色，或使用自定义取色器。
 - 选择光标的粗细。
 

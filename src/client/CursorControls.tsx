@@ -1,6 +1,6 @@
 /**
- * The caret preference controls: master switch, comet-trail switch, blink
- * switch, accent swatches with a custom picker, and the thickness picker.
+ * The caret preference controls: blink switch, accent swatches with a custom
+ * picker, and the thickness picker.
  *
  * These render into the Plugins page's bundle-configuration section, whose page
  * already draws the bundle's icon, title, version, description, and crumb above
@@ -18,8 +18,6 @@ import css from './CursorControls.module.css'
 export interface CursorControlsInjected {
   /** Bound snapshot selector hook, created by the apply side via bindSnapshotSelector. */
   useCursor: <T>(selector: (state: CursorPanelState) => T) => T
-  /** Toggle the comet trail. */
-  setTrail: (trail: boolean) => void
   /** Toggle caret blinking while idle. */
   setBlink: (blink: boolean) => void
   /** Set the accent color. */
@@ -57,7 +55,7 @@ function Switch({ checked, onChange, label }: SwitchProps) {
 }
 
 /** Render the caret preference rows, without any surrounding section chrome. */
-export function CursorControls({ t, useCursor, setTrail, setBlink, setColor, setSize }: CursorControlsProps) {
+export function CursorControls({ t, useCursor, setBlink, setColor, setSize }: CursorControlsProps) {
   const settings = useCursor(state => state.settings)
   return (
     <>
@@ -68,16 +66,6 @@ export function CursorControls({ t, useCursor, setTrail, setBlink, setColor, set
         </span>
         <span className={css.itemControl}>
           <Switch checked={settings.blink} onChange={setBlink} label={t('cursor.blink')} />
-        </span>
-      </div>
-
-      <div className={css.item}>
-        <span className={css.itemText}>
-          <span className={css.itemTitle}>{t('cursor.trail')}</span>
-          <span className={css.itemDesc}>{t('cursor.trailDescription')}</span>
-        </span>
-        <span className={css.itemControl}>
-          <Switch checked={settings.trail} onChange={setTrail} label={t('cursor.trail')} />
         </span>
       </div>
 

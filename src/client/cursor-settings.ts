@@ -15,11 +15,9 @@ export type CursorSize = (typeof CURSOR_SIZES)[number]
 
 /** Durable caret-effect preference set owned by the configuration panel. */
 export interface CursorSettings {
-  /** Comet trail: on = a fading tail; off = bare caret. */
-  trail: boolean
   /** Blinking caret: on = blinks when idle, steady while typing; off = always solid. */
   blink: boolean
-  /** Accent color (hex) of the caret and its trail. */
+  /** Accent color (hex) of the caret. */
   color: string
   /** Caret thickness. */
   size: CursorSize
@@ -40,9 +38,8 @@ export const CURSOR_COLOR_SWATCHES: readonly string[] = Object.freeze([
   '#F8FAFC', // near-white
 ])
 
-/** The effect defaults: trail on, blink on, brand-blue, medium. */
+/** The effect defaults: blink on, brand-blue, medium. */
 export const DEFAULT_CURSOR_SETTINGS: CursorSettings = Object.freeze({
-  trail: true,
   blink: true,
   color: DEFAULT_CURSOR_COLOR,
   size: 'medium',
@@ -63,14 +60,18 @@ function isColor(value: unknown): value is string {
 /**
  * Merge a partially-typed persisted section onto the defaults.
  *
- * A persisted `enabled` field is deliberately ignored, not honoured: the plugin's
- * own enable switch is the single master, so a stored `false` from an older build
- * must not leave the effect permanently off with no control left to turn it back on.
+ * Two persisted fields are deliberately dropped rather than honoured, because
+ * neither has a control left to change it back:
+ *
+ *  - `enabled`: the plugin's own enable switch is the single master, so a stored
+ *    `false` from an older build must not leave the effect permanently off.
+ *  - `trail`: the trail was removed and is being redesigned, so a stored `true`
+ *    would claim an effect that no longer exists. Picking known fields below is
+ *    what discards both; nothing extra is needed.
  */
 function normalize(input: Partial<CursorSettings> | null | undefined): CursorSettings {
   const source = input ?? {}
   return {
-    trail: typeof source.trail === 'boolean' ? source.trail : DEFAULT_CURSOR_SETTINGS.trail,
     blink: typeof source.blink === 'boolean' ? source.blink : DEFAULT_CURSOR_SETTINGS.blink,
     color: isColor(source.color) ? source.color : DEFAULT_CURSOR_SETTINGS.color,
     size: isCursorSize(source.size) ? source.size : DEFAULT_CURSOR_SETTINGS.size,

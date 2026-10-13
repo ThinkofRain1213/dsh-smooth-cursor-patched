@@ -1,5 +1,5 @@
 /* Caret preference controls: master switch, then stacked preference items
- * (comet-trail switch, blink switch, color swatches, thickness picker). The
+ * (blink switch, color swatches, thickness picker). The
  * Plugins page draws the bundle's own title, version, and description above
  * the section this body renders into, so the body carries no title chrome of
  * its own.

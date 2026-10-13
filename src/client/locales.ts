@@ -2,8 +2,6 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'cursor.trail': '彗星拖尾',
-  'cursor.trailDescription': '移动时在光标后带出一串渐隐尾迹',
   'cursor.blink': '光标闪烁',
   'cursor.blinkDescription': '静止时如原生光标般规律闪烁，移动时保持常亮',
   'cursor.color': '颜色',
@@ -19,8 +17,6 @@ export type CursorKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'cursor.trail': 'Comet trail',
-  'cursor.trailDescription': 'Trails a fading tail behind the caret as it moves',
   'cursor.blink': 'Caret blinking',
   'cursor.blinkDescription': 'Blinks the caret when idle, stays solid while moving',
   'cursor.color': 'Color',

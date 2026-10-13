@@ -18,8 +18,7 @@ export interface CursorPanelState {
 
 /** Shallow-compare two caret preferences for the write guard. */
 function sameSettings(left: CursorSettings, right: CursorSettings): boolean {
-  return left.trail === right.trail
-    && left.blink === right.blink
+  return left.blink === right.blink
     && left.color === right.color
     && left.size === right.size
 }
@@ -45,11 +44,6 @@ export class CursorController {
     this.engine = new CursorEngine(this.settings)
     this.engine.apply(this.settings)
     this.state = createSnapshotStore<CursorPanelState>({ settings: this.settings, revision: this.revision })
-  }
-
-  /** Toggle the typing trail. */
-  setTrail(trail: boolean): void {
-    this.update({ ...this.settings, trail })
   }
 
   /** Toggle caret blinking while idle. */

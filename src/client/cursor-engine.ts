@@ -5,10 +5,13 @@
  * reproduced 1:1 on an overlay <canvas> while the caret target coordinates
  * come from the textarea/contenteditable layout via mirror/DOM measurement.
  *
- * Comet mode, exactly as the plugin: the caret is a small rectangle that eases
- * toward the target with a soft lerp; while it travels it leaves a tapered,
- * fading stroke trail. (The plugin's Blink mode is removed at the user's
- * request — this feature is comet-only.)
+ * The caret is a small rectangle that eases toward the target with a soft lerp.
+ * It deliberately carries no trail, no glow, and no width growth: the upstream
+ * plugin's tapered fading trail, its `moving`-gated `shadowBlur`, and its
+ * `lineWidth` ramp were all removed on purpose (archived under
+ * `.agent/backups/dsh-smooth-cursor-发光放大彗星-*`) and a replacement trail is
+ * being designed from scratch. Do not re-add them by copying the upstream file.
+ * (The plugin's Blink mode is likewise gone at the user's request.)
  *
  * IME is handled by re-measuring every frame while a composition is active
  * (the browser can lay the preview out differently than the mirror).
@@ -49,16 +52,14 @@ export const ANSWER_SELECTOR = '[data-question-key] textarea, [data-question-scr
 /** Union matcher used by the capture-phase IME listeners and composer focus check. */
 const COMPOSER_ANY = `${TEXTAREA_SELECTOR}, ${COMPOSER_SELECTOR}, ${ANSWER_SELECTOR}`
 
-/** Comet-mode caret width per size. */
+/** Caret width per size. */
 const COMET_WIDTH: Record<CursorSize, number> = { small: 1.5, medium: 2, large: 2.5 }
-/** Comet trail length per size (the plugin's default is 5). */
-const COMET_TRAIL: Record<CursorSize, number> = { small: 5, medium: 7, large: 10 }
 
-/** Smoothness of the glide (the plugin's comet 0.2). */
+/** Smoothness of the glide (the plugin's 0.2). */
 const COMET_SMOOTHNESS = 0.2
 /** Distance below which the eased caret snaps onto the target. */
 const SNAP_EPSILON = 0.1
-/** Comet mode: travel below this counts as "resting" (no new trail). */
+/** Travel below this counts as "resting": the blink settles and holds solid while typing. */
 const COMET_MOVE_THRESHOLD = 0.2
 
 const CARET_CSS = `
@@ -428,8 +429,8 @@ const MIRROR_STYLE_PROPS: readonly (keyof CSSStyleDeclaration & string)[] = [
 /**
  * Canvas caret engine. Constructor mounts the overlay canvas + style + the
  * document-capture IME listeners when a browser document exists (node runs
- * see none and become no-ops); {@link apply} drives visibility, color,
- * thickness, and the trail switch; {@link dispose} tears everything.
+ * see none and become no-ops); {@link apply} drives visibility, color, and
+ * thickness; {@link dispose} tears everything.
  */
 export class CursorEngine {
   private settings: CursorSettings
@@ -456,9 +457,6 @@ export class CursorEngine {
   private targetY = 0
   private currentHeight = 20
   private initialized = false
-
-  // Comet trail (plugin state).
-  private trailPts: { x: number; y: number }[] = []
 
   // Blink timing: standard 500ms half-cycle (VS Code / Web standard cadence).
   private lastActivityTime = performance.now()
@@ -523,9 +521,8 @@ export class CursorEngine {
   }
 
   /**
-   * Apply one effect preference: color, thickness, trail switch, and the
-   * native-caret lock. A synchronous pass renders immediately against the
-   * current focus.
+   * Apply one effect preference: color, thickness, and the native-caret lock.
+   * A synchronous pass renders immediately against the current focus.
    *
    * There is no enabled branch here: whether the effect runs at all is decided
    * by the plugin's own enable switch, which controls whether this bundle is
@@ -564,7 +561,7 @@ export class CursorEngine {
     // Only the instance that currently holds the flag may clear it. Under an
     // HMR reload a fresh engine can have enabled the effect before this disposer
     // runs; an unconditional removal would switch the native caret back on while
-    // the new instance keeps drawing the comet.
+    // the new instance keeps drawing the caret.
     if (root.dataset.cursorOwner === this.ownerToken) {
       root.classList.remove('dsh-cursor-active')
       delete root.dataset.cursorOwner
@@ -584,7 +581,7 @@ export class CursorEngine {
 
     // Self-heal the companion stylesheet. `caret-color: transparent` can only be
     // expressed as a rule over the composer element, so losing the tag would
-    // bring the native caret back beside the comet. `isConnected` is a property
+    // bring the native caret back beside the drawn caret. `isConnected` is a property
     // read rather than a DOM query, so re-checking it every frame is free.
     if (this.style !== undefined && !this.style.isConnected) {
       document.head.appendChild(this.style)
@@ -604,9 +601,8 @@ export class CursorEngine {
     const composer = this.focusedComposer()
     if (composer === null) {
       // The composer lost focus (e.g. Settings opened): draw nothing and drop
-      // the stale caret/trail, so the effect never floats over other chrome.
+      // the stale caret, so the effect never floats over other chrome.
       this.clear()
-      this.trailPts = []
       this.initialized = false
       this.lastSignature = ''
       this.activeComposer = null
@@ -614,12 +610,11 @@ export class CursorEngine {
     }
 
     // Re-seat instantly when the focused input surface changes (chat composer ↔
-    // question card): a cross-screen glide would drag a comet trail over chrome.
+    // question card): a cross-screen glide would sweep the caret over chrome.
     if (this.activeComposer !== composer) {
       this.activeComposer = composer
       this.initialized = false
       this.lastSignature = ''
-      this.trailPts = []
       this.lastActivityTime = performance.now()
     }
 
@@ -671,7 +666,7 @@ export class CursorEngine {
     if (this.overlay.style.height !== `${cssHeight}px`) this.overlay.style.height = `${cssHeight}px`
   }
 
-  /** Comet mode with scrollport clipping and out-of-bounds culling. */
+  /** Eased caret with scrollport clipping and out-of-bounds culling. */
   private renderComet(ctx: CanvasRenderingContext2D, clipRect: DOMRect): void {
     const target = this.targetX
     if (Math.abs(this.targetX - this.currentX) < SNAP_EPSILON) this.currentX = this.targetX
@@ -679,23 +674,13 @@ export class CursorEngine {
     if (Math.abs(this.targetY - this.currentY) < SNAP_EPSILON) this.currentY = this.targetY
     else this.currentY += (this.targetY - this.currentY) * COMET_SMOOTHNESS
 
+    // The caret must stay solid while it travels, so "moving" feeds the blink.
     const moving = Math.hypot(this.targetX - this.currentX, this.targetY - this.currentY) > COMET_MOVE_THRESHOLD
-    if (moving) {
-      this.lastActivityTime = performance.now()
-      if (this.settings.trail) {
-        this.trailPts.push({ x: this.currentX, y: this.currentY })
-        if (this.trailPts.length > COMET_TRAIL[this.settings.size]) this.trailPts.shift()
-      } else {
-        this.trailPts = []
-      }
-    } else {
-      this.trailPts = []
-    }
+    if (moving) this.lastActivityTime = performance.now()
 
-    // Out-of-bounds culling: if caret is completely outside the scroll viewport, drop trail and skip draw
+    // Out-of-bounds culling: if caret is completely outside the scroll viewport, skip the draw
     const caretBottom = this.currentY + (this.currentHeight || 20)
     if (caretBottom <= clipRect.top || this.currentY >= clipRect.bottom) {
-      this.trailPts = []
       return
     }
 
@@ -703,40 +688,15 @@ export class CursorEngine {
     // caret lines that scrolled out of view, and the composer always wraps so nothing
     // ever overflows horizontally. A full-box rect shaves the caret's own half-width in
     // half whenever it sits on the content origin (a padding-0 field puts it exactly on
-    // the box's left edge), which makes a 2px comet read as a 1px native caret.
+    // the box's left edge), which makes a 2px caret read as a 1px native caret.
     ctx.save()
     ctx.beginPath()
     ctx.rect(0, clipRect.top, window.innerWidth, clipRect.height)
     ctx.clip()
 
-    if (this.settings.trail && this.trailPts.length > 0) {
-      this.drawCometTrail(ctx)
-    }
     this.drawCometHead(ctx, moving)
 
     ctx.restore()
-  }
-
-  private drawCometTrail(ctx: CanvasRenderingContext2D): void {
-    if (this.trailPts.length < 2) return
-    const color = this.settings.color
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.shadowBlur = 8
-    ctx.shadowColor = color
-    const width = COMET_WIDTH[this.settings.size]
-    for (let s = 0; s < this.trailPts.length - 1; s += 1) {
-      const from = this.trailPts[s]
-      const to = this.trailPts[s + 1]
-      if (from === undefined || to === undefined) continue
-      const a = s / this.trailPts.length
-      ctx.beginPath()
-      ctx.moveTo(from.x, from.y)
-      ctx.lineTo(to.x, to.y)
-      ctx.lineWidth = width + a * 2
-      ctx.strokeStyle = this.hexToRgba(color, a)
-      ctx.stroke()
-    }
   }
 
   private drawCometHead(ctx: CanvasRenderingContext2D, moving: boolean): void {
@@ -753,16 +713,7 @@ export class CursorEngine {
     const width = COMET_WIDTH[this.settings.size]
     const n = Math.max(8, this.currentHeight || 24)
     ctx.fillStyle = color
-    ctx.shadowBlur = moving ? 10 : 0
-    ctx.shadowColor = color
     ctx.fillRect(this.currentX - width / 2, this.currentY, width, n)
-  }
-
-  private hexToRgba(hex: string, alpha: number): string {
-    const r = Number.parseInt(hex.slice(1, 3), 16)
-    const g = Number.parseInt(hex.slice(3, 5), 16)
-    const b = Number.parseInt(hex.slice(5, 7), 16)
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`
   }
 
   private clear(): void {

@@ -1,7 +1,7 @@
 /**
  * Browser apply for the cursor plugin: registers the Input-caret configuration
  * into the Plugins page's bundle-configuration slot and manages the cursor
- * controller lifecycle. The effect engine (canvas comet) is browser-only,
+ * controller lifecycle. The effect engine (canvas caret) is browser-only,
  * driven by the controller, which reads the stored preference from
  * localStorage.
  *
@@ -50,7 +50,6 @@ export function apply(ctx: import('@deepseek-ai/cordis').Context): void {
     locale: NS,
     inject: (): CursorControlsInjected => ({
       useCursor: bindSnapshotSelector(controller.state),
-      setTrail: (value) => { controller.setTrail(value) },
       setBlink: (value) => { controller.setBlink(value) },
       setColor: (value) => { controller.setColor(value) },
       setSize: (value) => { controller.setSize(value) },

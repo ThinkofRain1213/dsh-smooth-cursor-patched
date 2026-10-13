@@ -2,7 +2,7 @@
 
 **[中文](README.md) | English**
 
-A smooth, comet-mode animated caret for the [DSH](https://github.com/deepseek-ai/deepseek-harness) chat composer textarea — a standalone installable DSH plugin. Replaces the native text caret with a glowing comet that glides across the input as you type, with a configurable trail, accent color, and thickness.
+A smooth, animated caret for the [DSH](https://github.com/deepseek-ai/deepseek-harness) chat composer textarea — a standalone installable DSH plugin. Replaces the native text caret with one that glides across the input as you type, with a configurable accent color and thickness.
 
 [![npm version](https://img.shields.io/npm/v/dsh-smooth-cursor-patched?label=npm&color=5965d8)](https://www.npmjs.com/package/dsh-smooth-cursor-patched)
 [![GitHub Release](https://img.shields.io/github/v/release/ThinkofRain1213/dsh-smooth-cursor-patched?label=release&color=5965d8)](https://github.com/ThinkofRain1213/dsh-smooth-cursor-patched/releases)
@@ -38,9 +38,8 @@ Also added: a **caret breath (blink)** aligned to the VS Code / native 500 ms ca
 ## Features
 
 - **Smooth caret** — a smooth eased caret that glides to the text position.
-- **Comet trail** — a tapered, fading trail follows the caret while you move it.
 - **Breath toggle** — a 500 ms cadence that can be switched off independently.
-- **Configurable** — enable/disable, trail on/off, accent color (preset swatches or custom picker), thickness (thin / medium / thick).
+- **Configurable** — accent color (preset swatches or custom picker), thickness (thin / medium / thick).
 - **Local persistence** — settings are stored in `localStorage`; no host restart or round-trip needed.
 
 ## Install
@@ -89,7 +88,6 @@ Then register it in your profile's `cordis.patch.yml`:
 
 The effect activates whenever the composer textarea has focus. Open **Plugins → dsh-smooth-cursor-patched** and use the configuration section to:
 
-- Toggle the whole effect or just the comet trail.
 - Toggle caret blinking while idle.
 - Pick an accent color from the swatches, or use the custom color picker.
 - Choose the caret thickness.

@@ -1,6 +1,6 @@
 {
   "name": "dsh-smooth-cursor-patched",
-  "description": "Smooth comet-mode animated caret for the DSH chat composer and question cards — enhanced community patched edition",
+  "description": "Smooth animated caret for the DSH chat composer and question cards — enhanced community patched edition",
   "version": "0.1.9-patched.6",
   "license": "MIT",
   "type": "module",
