@@ -448,6 +448,16 @@ export class CursorEngine {
   private raf = 0
   /** Whether the draw loop is scheduled (started on the first enabling apply). */
   private running = false
+  /**
+   * Set by {@link dispose} and never cleared. The loop re-schedules itself from
+   * INSIDE the frame callback, so cancelling `raf` from the outside can lose the
+   * race: a frame already running past that point schedules the next one after
+   * `dispose` has cancelled the old handle. Without this flag that orphaned
+   * loop keeps running forever — one zombie engine per plugin re-apply, each
+   * reflowing the page every frame through the textarea mirror measurement.
+   * The flag is checked before every re-schedule so the loop always drains.
+   */
+  private disposed = false
   private dpr = 1
 
   // Eased caret + target (viewport px).
@@ -536,6 +546,11 @@ export class CursorEngine {
    * loaded. Once loaded, the engine is always on.
    */
   apply(settings: CursorSettings): void {
+    // A disposed engine has already torn down its overlay and style nodes; an
+    // apply on it would draw into a detached canvas and resurrect the native
+    // caret lock without a matching remove. The controller creates one engine
+    // per plugin apply, so a disposed instance must stay dead.
+    if (this.disposed) return
     this.settings = settings
     if (this.overlay === undefined) return
     this.overlay.dataset.color = settings.color
@@ -555,11 +570,16 @@ export class CursorEngine {
     this.renderOnce()
   }
 
-  /** Remove the overlay, style, listeners, and native-caret lock. */
+  /** Remove the overlay, style, listeners, and native-caret lock. Idempotent. */
   dispose(): void {
     if (this.overlay === undefined) return
+    // Set the flag FIRST: the loop checks it at its top and before every
+    // re-schedule, so this is what actually stops a frame that is mid-flight
+    // from arming its successor. Cancelling the handle alone would race.
+    this.disposed = true
     this.running = false
     caf(this.raf)
+    this.raf = 0
     document.removeEventListener('compositionstart', this.onCompositionStart, { capture: true })
     document.removeEventListener('compositionend', this.onCompositionEnd, { capture: true })
     this.overlay.remove()
@@ -577,7 +597,19 @@ export class CursorEngine {
 
   /** One animation frame: size, measure, ease, draw. */
   private readonly loop = (): void => {
+    // Drained by dispose(): stop re-scheduling instead of keeping a detached
+    // engine alive on the animation frame queue. See `disposed`.
+    if (this.disposed) {
+      this.running = false
+      return
+    }
     this.renderOnce()
+    // dispose() may have run inside renderOnce (it is synchronous, but a future
+    // refactor could await), so re-check before arming the next frame.
+    if (this.disposed) {
+      this.running = false
+      return
+    }
     this.raf = raf(this.loop)
   }
 
