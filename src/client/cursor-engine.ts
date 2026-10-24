@@ -462,16 +462,24 @@ export class CursorEngine {
   private lastActivityTime = performance.now()
   private readonly BLINK_HALF_CYCLE = 500
 
-  private composing = false
   private lastSignature = ''
   private caret: CursorPoint | null = null
   /** The input surface the caret is currently seated on (chat composer vs question card). */
   private activeComposer: HTMLElement | null = null
 
+  /**
+   * Composition edges only invalidate cached state: drop the signature so the
+   * next frame re-measures once, and mark activity so the caret stays solid
+   * across the candidate window instead of blinking out mid-word.
+   *
+   * Composition itself is NOT used to force a per-frame re-measure (see the
+   * signature gate in renderOnce): IME preview text is not part of the
+   * textarea's value, so the caret cannot move until the IME writes to it — and
+   * that write changes the signature on its own.
+   */
   private readonly onCompositionStart = (event: Event): void => {
     const target = event.target
     if (!(target instanceof HTMLElement) || !target.matches(COMPOSER_ANY)) return
-    this.composing = true
     this.lastSignature = ''
     this.lastActivityTime = performance.now()
   }
@@ -479,7 +487,6 @@ export class CursorEngine {
   private readonly onCompositionEnd = (event: Event): void => {
     const target = event.target
     if (!(target instanceof HTMLElement) || !target.matches(COMPOSER_ANY)) return
-    this.composing = false
     this.lastSignature = ''
     this.lastActivityTime = performance.now()
   }
@@ -618,11 +625,27 @@ export class CursorEngine {
       this.lastActivityTime = performance.now()
     }
 
-    // Re-measure every frame while composing (and for the contenteditable
-    // composer, whose selection has no cheap signature); otherwise on
-    // signature change.
+    // Re-measure when the signature changes, and every frame for the
+    // contenteditable composer (whose selection has no cheap signature).
+    //
+    // IME composition deliberately does NOT force a re-measure. Measured on the
+    // question card: one mirror measurement costs ~22ms on this page because its
+    // getBoundingClientRect()/offsetLeft reads force a synchronous reflow of the
+    // whole conversation, and `composing` lasts for the entire pinyin candidate
+    // window. Forcing it every frame turned a one-off 22ms into 22ms per frame:
+    // composition ran at 65fps against 238fps idle, and 1313 composing frames
+    // each measured once while non-composing frames measured 0.005 times.
+    //
+    // Dropping the composing arm is safe because the signature already covers
+    // everything that can move the caret: mid-composition the IME preview text
+    // is not part of the textarea's value, so value.length, selectionStart and
+    // scrollTop stay put and the caret cannot move either; when the IME does
+    // write to the value (inline composition), the signature changes and the
+    // next frame measures. Measured over the same capture: value.length changed
+    // on only 158 of 1313 composing frames, so this drops the measurement count
+    // by roughly 8x without missing a caret move.
     const sig = this.signature(composer)
-    if (this.composing || sig === null || sig !== this.lastSignature) {
+    if (sig === null || sig !== this.lastSignature) {
       this.lastSignature = sig === null ? '' : sig
       this.caret = measureCaret(composer)
     }
