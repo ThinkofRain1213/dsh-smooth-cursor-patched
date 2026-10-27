@@ -8,7 +8,14 @@
  *
  * Live values come from the controller's snapshot store; writes route back
  * through the injected faces and persist in localStorage.
+ *
+ * The blink row uses the official `Switch` rather than a local one: the shared
+ * settings-page spec (`DSH-插件设置页UI规范.md` §3.1) requires the primitives
+ * control, which already carries its own track/thumb tokens, focus ring,
+ * disabled styling, and reduced-motion handling. Re-implementing it meant
+ * keeping ~88 lines of CSS in step with the official tokens by hand.
  */
+import { Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { CURSOR_COLOR_SWATCHES, CURSOR_SIZES, type CursorSize } from './cursor-settings.ts'
 import type { CursorPanelState } from './cursor-controller.ts'
@@ -30,29 +37,6 @@ export interface CursorControlsInjected {
 export type CursorControlsProps =
   PropsLocale<'cursor-effect'>
   & InjectFace<CursorControlsInjected>
-
-interface SwitchProps {
-  checked: boolean
-  onChange: (checked: boolean) => void
-  label: string
-}
-
-function Switch({ checked, onChange, label }: SwitchProps) {
-  return (
-    <label className={css.switch}>
-      <input
-        type="checkbox"
-        className={css.switchInput}
-        checked={checked}
-        onChange={(event) => { onChange(event.target.checked) }}
-        aria-label={label}
-      />
-      <span className={css.switchTrack} aria-hidden="true">
-        <span className={css.switchThumb} />
-      </span>
-    </label>
-  )
-}
 
 /** Render the caret preference rows, without any surrounding section chrome. */
 export function CursorControls({ t, useCursor, setBlink, setColor, setSize }: CursorControlsProps) {

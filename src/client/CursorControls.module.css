@@ -4,14 +4,14 @@
  * the section this body renders into, so the body carries no title chrome of
  * its own.
  *
- * ── Row type and spacing follow the sibling plugin card ────────────────────
- * Every value below is copied from `dsh-project-groups`'
- * `settings-card.module.css`, whose own comments trace each one back to the
- * official plugin cards it was measured against. Both cards render into the
- * same `plugins.bundle.config` slot, so they must read as one surface:
+ * ── Row type and spacing follow the shared settings-page spec ──────────────
+ * Values come from `DSH-插件设置页UI规范.md`, whose own numbers are traced back
+ * to the official plugin cards (and to `dsh-project-groups`, which measured the
+ * same ones). Both cards render into the same `plugins.bundle.config` slot, so
+ * they must read as one surface:
  *
  *   `.rowText { gap: 6px }` → title/hint pair, 6px on both official cards
- *   `.row    { gap: 8px; padding: 16px 0 }` → the official settings-row block
+ *   `.row    { gap: 8px; padding: 12px 0 }` → the spec's §2.1 row padding
  *   `.title  { 13px/500/19.5px }` → `终端` and `子智能体` row labels
  *   `.desc   { 12px/400/18px }`  → the same two cards' hints
  *   `.cubeRow { gap: 8px }` → the spec's value for a row of peer controls
@@ -20,10 +20,10 @@
  * height is 1.5 × 13px, the ratio the whole spec uses. */
 
 /* `gap: 0` is deliberate, and it is the spec's own design: each row carries
- * its own `padding: 16px 0` instead of the parent spacing them. The shared
+ * its own `padding: 12px 0` instead of the parent spacing them. The shared
  * `detailSection` container applies its own `gap: 12px` to this panel's
  * children, and a row's own padding is what takes the card out of its reach —
- * two neighbouring rows then sit 16 + 16 = 32px apart, as the spec intends. */
+ * two neighbouring rows then sit 12 + 12 = 24px apart, as the spec intends. */
 .panel {
   display: flex;
   flex-direction: column;
@@ -31,12 +31,21 @@
 }
 
 /* The official settings-row block: 8px between the text column and the
- * control, 16px above and below the row itself. */
+ * control, 12px above and below the row itself.
+ *
+ * 12px is the shared settings-page spec's row padding (§2.1), not the 16px the
+ * sibling DPG card uses. The spec's reason for 16px is that a card mixing
+ * horizontal rows with the official `SettingsValueField` — which carries its
+ * own `padding: 12px 0` and cannot be changed — must match that field's value,
+ * or the two kinds of row end up on 32px and 24px rhythms. This card has no
+ * `SettingsValueField`, so the spec's fallback (16px, matching DPG) also
+ * applied; 12px is chosen anyway so every card in this slot reads at the same
+ * density. Adjacent rows sit 12 + 12 = 24px apart. */
 .item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px 0;
+  padding: 12px 0;
 }
 
 /* The name/description pair. `gap: 6px` is what both official plugin cards use
@@ -77,86 +86,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* ── pill switch ────────────────────────────────────────────────────────── */
-
-/* Mirrors the official `@deepseek-ai/dsh-client-ui-primitives` Switch tokens so
- * the control flips with the theme instead of blending into it:
- *
- *   - OFF track is `border-l3`, a translucent stroke colour (dark: #ffffff29),
- *     not a solid fill token.
- *   - The thumb is the brand colour's *contrast foreground*
- *     (`label-primary-foreground`: #fff on light, #0f1115 on dark). A fixed
- *     static swatch (e.g. neutral-bluish-50 = #f9fafb) is wrong: on dark the
- *     brand track is also near-white, so track and thumb collapsed into one
- *     solid pill and the state became unreadable.
- *   - While OFF, the thumb uses `switch-thumb` — the token the official
- *     stylesheet added in 0.2.0-rc.1, which softens the resting thumb to a mid
- *     grey (#adb2b8) on dark. It does not exist before that release, so the
- *     fallback keeps the previous contrast foreground and older DSH builds
- *     render exactly as they did.
- */
-
-.switch {
-  display: inline-flex;
-  cursor: pointer;
-}
-
-.switchInput {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  border: 0;
-}
-
-.switchTrack {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  width: 36px;
-  height: 20px;
-  padding: 2px;
-  border: 0;
-  border-radius: 999px;
-  /* The capsule opts out of the global superellipse, like the official track. */
-  corner-shape: round;
-  background: var(--dsw-alias-border-l3);
-  transition: background 0.12s ease;
-}
-
-.switchThumb {
-  display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  corner-shape: round;
-  background: var(--dsw-alias-label-primary-foreground);
-  transform: translateX(0);
-  transition: transform 0.12s ease;
-}
-
-.switchInput:checked + .switchTrack {
-  background: var(--dsw-alias-brand-primary);
-}
-
-/* Resting thumb: the official 0.2.0-rc.1+ token, with the older contrast
- * foreground as the fallback so DSH < 0.2.0-rc.1 keeps its previous look. */
-.switchInput:not(:checked) + .switchTrack .switchThumb {
-  background: var(--dsw-alias-switch-thumb, var(--dsw-alias-label-primary-foreground));
-}
-
-.switchInput:checked + .switchTrack .switchThumb {
-  transform: translateX(16px);
-}
-
-.switchInput:focus-visible + .switchTrack {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: 2px;
 }
 
 /* ── color swatches ─────────────────────────────────────────────────────── */
