@@ -13,8 +13,9 @@
  * being designed from scratch. Do not re-add them by copying the upstream file.
  * (The plugin's Blink mode is likewise gone at the user's request.)
  *
- * IME is handled by re-measuring every frame while a composition is active
- * (the browser can lay the preview out differently than the mirror).
+ * IME composition edges invalidate the cached signature; they do not force a
+ * re-measure on every frame. Textareas prefer the official answer mirror's
+ * Range geometry, with the legacy mirror retained as a fallback.
  *
  * All state is re-read each animation frame — `document.activeElement`, the
  * input's selection/scroll, and its bounding rect — so nothing needs
@@ -116,8 +117,70 @@ function measureCaret(input: HTMLElement): CursorPoint | null {
   return measureRichCaret(input)
 }
 
-/** Mirror-measure a native textarea caret; converts to viewport coords. */
-function measureTextareaCaret(textarea: HTMLTextAreaElement): CursorPoint | null {
+/**
+ * Measure a textarea caret through the official answer-field mirror.
+ *
+ * The official mirror already contains the complete draft plus a trailing newline
+ * and shares the textarea's grid cell and typography. A Range therefore supplies
+ * the caret without creating, inserting, or deleting any measurement nodes.
+ * @returns viewport coordinates, or null when the mirror cannot be trusted and the
+ * caller must use the legacy mirror path.
+ */
+export function measureOfficialMirrorCaret(textarea: HTMLTextAreaElement, caret: number): CursorPoint | null {
+  const value = textarea.value
+  if (!Number.isInteger(caret) || caret < 0 || caret > value.length) return null
+  const mirror = textarea.previousElementSibling
+  if (!(mirror instanceof HTMLDivElement)) return null
+  if (mirror.getAttribute('aria-hidden') !== 'true') return null
+  if (mirror.childNodes.length !== 1 || mirror.firstChild?.nodeType !== Node.TEXT_NODE) return null
+  if (mirror.textContent !== `${value}\n`) return null
+  const text = mirror.firstChild
+
+  const hasGeometry = (rect: DOMRect): boolean =>
+    rect.width > 0 || rect.height > 0 || rect.top !== 0 || rect.left !== 0
+
+  // The trailing newline guarantees a forward character even at the end of the
+  // draft. Its left edge avoids the end-of-text ambiguity of a collapsed Range.
+  const forward = document.createRange()
+  forward.setStart(text, caret)
+  forward.setEnd(text, caret + 1)
+  let rect = forward.getBoundingClientRect()
+
+  // A collapsed range is the zero-cost fallback for a forward glyph with no box.
+  if (!hasGeometry(rect)) {
+    const collapsed = document.createRange()
+    collapsed.setStart(text, caret)
+    collapsed.setEnd(text, caret)
+    rect = collapsed.getBoundingClientRect()
+  }
+  if (!hasGeometry(rect)) return null
+
+  const mirrorRect = mirror.getBoundingClientRect()
+  const textareaRect = textarea.getBoundingClientRect()
+  const style = window.getComputedStyle(textarea)
+  const lineHeight = parseFloat(style.lineHeight) || 20
+  const fontSize = parseFloat(style.fontSize) || 14
+  const height = Math.min(lineHeight, Math.round(fontSize * 1.35) || 19)
+  return {
+    left: rect.left + (textareaRect.left - mirrorRect.left) - textarea.scrollLeft,
+    // Range rects already describe the glyph/caret box, so no half-leading is added.
+    top: rect.top + (textareaRect.top - mirrorRect.top) - textarea.scrollTop,
+    height,
+  }
+}
+
+/** Prefer the official answer mirror; fall back to the legacy mirror when it is unavailable. */
+export function measureTextareaCaret(textarea: HTMLTextAreaElement): CursorPoint | null {
+  const value = textarea.value
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  if (start < 0 || end < start || end > value.length) return null
+  const caret = start !== end && textarea.selectionDirection === 'forward' ? end : start
+  return measureOfficialMirrorCaret(textarea, caret) ?? measureTextareaCaretLegacy(textarea)
+}
+
+/** Legacy mirror-measure a native textarea caret; converts to viewport coords. */
+function measureTextareaCaretLegacy(textarea: HTMLTextAreaElement): CursorPoint | null {
   const value = textarea.value
   const start = textarea.selectionStart
   const end = textarea.selectionEnd
