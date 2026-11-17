@@ -1,7 +1,7 @@
 {
   "name": "dsh-smooth-cursor-patched",
   "description": "Smooth animated caret for the DSH chat composer and question cards — enhanced community patched edition",
-  "version": "0.1.9-patched.6",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
   "repository": {
