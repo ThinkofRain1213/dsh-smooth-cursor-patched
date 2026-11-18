@@ -26,8 +26,11 @@ runs:
       shell: bash
       run: pnpm install --frozen-lockfile
     - name: Run the caret measurement tests
+      # The glob is expanded by bash before node sees it: passing a directory
+      # (`node --test tests/`) only works on newer Node lines and failed on
+      # 22.18/24 with "Cannot find module '.../tests'".
       shell: bash
-      run: node --test tests/
+      run: node --test tests/*.test.mjs
     - name: Type-check the sources
       shell: bash
       run: pnpm run typecheck
