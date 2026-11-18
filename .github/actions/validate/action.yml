@@ -1,0 +1,45 @@
+name: Validate the plugin
+description: >-
+  Run the caret measurement tests, type-check the sources, build both bundles,
+  assert the loader-id contract, and prove the committed `lib/` still matches
+  `src/`. Shared by every Validate matrix entry so the steps cannot drift
+  between platforms.
+
+inputs:
+  node:
+    description: Node version to install.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: 12.4.1
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node }}
+        cache: pnpm
+    - name: Install locked dependencies
+      # `prepare` builds and runs the register-id check, so this also proves the
+      # package installs and builds without an explicit build step.
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Run the caret measurement tests
+      shell: bash
+      run: node --test tests/
+    - name: Type-check the sources
+      shell: bash
+      run: pnpm run typecheck
+    - name: Build the node and client bundles
+      shell: bash
+      run: pnpm run build
+    - name: Assert the bundle's registration id matches the patch name
+      shell: bash
+      run: pnpm run check:register-id
+    - name: Assert the committed client artifact is in sync with src/
+      # The build is deterministic (verified byte-identical across runs), so a
+      # dirty `lib/` here means a source change was committed without its
+      # regenerated artifact.
+      shell: bash
+      run: git diff --exit-code -- lib/
